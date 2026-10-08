@@ -78,6 +78,8 @@ struct ShortcutsHelpView: View {
                 row("Extend selection (grid)", "⇧ + ← → ↑ ↓  ·  ⇧/⌘-click  ·  drag")
                 row("Select all / deselect", "⌘A / ⇧⌘A")
                 row("Expand / collapse all stacks", "⌥⌘→ / ⌥⌘←")
+                row("Burst stacks on / off", "⇧S")
+                row("Expand / collapse a stack", "double-click it · S")
                 row("RAW+JPEG one · separate · JPEG · RAW", "⌥⌘1 / 2 / 3 / 4")
                 row("RAW look: True RAW ↔ camera preview", "⌥⌘R")
                 row("Sort by time · name · rating · date · size", "⌃⌘1 … 5")

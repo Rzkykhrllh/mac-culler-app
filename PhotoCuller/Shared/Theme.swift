@@ -11,17 +11,17 @@ enum Theme {
     static let nsAccentStart = NSColor(red: 1.00, green: 0.74, blue: 0.30, alpha: 1)
     static let nsAccentEnd = NSColor(red: 1.00, green: 0.42, blue: 0.45, alpha: 1)
 
-    /// Window backdrop behind the grid / loupe.
+    /// Window backdrop: neutral graphite, so it never tints how photo colors are perceived.
     static let backdrop = LinearGradient(
-        colors: [Color(red: 0.07, green: 0.07, blue: 0.11), Color(red: 0.09, green: 0.08, blue: 0.14), Color(red: 0.05, green: 0.06, blue: 0.08)],
+        colors: [Color(white: 0.115), Color(white: 0.085), Color(white: 0.06)],
         startPoint: .topLeading, endPoint: .bottomTrailing)
 
-    /// Soft colored glows layered over the backdrop.
+    /// Very soft warm light (matches the amber accent) layered over the backdrop.
     struct Glow: View {
         var body: some View {
             ZStack {
-                RadialGradient(colors: [Color(red: 0.36, green: 0.28, blue: 0.75).opacity(0.28), .clear], center: .topLeading, startRadius: 0, endRadius: 650)
-                RadialGradient(colors: [Color(red: 1.0, green: 0.45, blue: 0.35).opacity(0.16), .clear], center: .bottomTrailing, startRadius: 0, endRadius: 600)
+                RadialGradient(colors: [Color(red: 1.0, green: 0.72, blue: 0.35).opacity(0.07), .clear], center: .topLeading, startRadius: 0, endRadius: 700)
+                RadialGradient(colors: [Color(red: 1.0, green: 0.55, blue: 0.40).opacity(0.05), .clear], center: .bottomTrailing, startRadius: 0, endRadius: 650)
             }
             .allowsHitTesting(false)
         }

@@ -187,6 +187,12 @@ struct FileViewSwitcher: View {
             .fixedSize()
             .help("RAW + JPEG as one photo · separately · JPEG only · RAW only (⌥⌘1–4)")
 
+            Toggle(isOn: Binding(get: { app.settings.stackBursts }, set: { app.setStackBursts($0) })) {
+                Label("Stacks", systemImage: "square.stack")
+            }
+            .toggleStyle(.button)
+            .help("Group bursts into stacks (⇧S)")
+
             if session.fileView != .combined && session.fileView != .jpegOnly {
                 Picker("", selection: Binding(get: { app.settings.rawRendering }, set: { app.setRawRendering($0) })) {
                     Text("True RAW").tag(RawRendering.rendered)

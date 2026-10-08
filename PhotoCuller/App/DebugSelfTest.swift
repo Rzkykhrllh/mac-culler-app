@@ -109,6 +109,12 @@ enum DebugSelfTest {
         let combined = s.matchingCount
         s.setFileView(.both); try? await Task.sleep(for: .milliseconds(800)); await waitRegroup()
         let both = s.matchingCount
+        let mixed = s.stackMembers.values.filter { m in Set(m.compactMap { s.items[$0]?.files.primary.kind.isRaw }).count > 1 }
+        check(mixed.isEmpty, "separate mode: no stack mixes a JPEG with a RAW (\(s.stackMembers.count) stacks)")
+        let wasStacking = s.settings.stackBursts
+        s.app.setStackBursts(false)
+        check(s.stackMembers.isEmpty && s.display.count == s.matchingCount, "stacks off: every photo shown on its own")
+        s.app.setStackBursts(wasStacking)
         s.setFileView(.jpegOnly); try? await Task.sleep(for: .milliseconds(200))
         let jpeg = s.matchingCount
         s.setFileView(.rawOnly); try? await Task.sleep(for: .milliseconds(200))

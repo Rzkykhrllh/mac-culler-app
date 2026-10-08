@@ -23,6 +23,8 @@ final class AppSettings {
         didSet { defaults.set(try? JSONEncoder().encode(renamePresets), forKey: Keys.presets) }
     }
     var showDebugOverlay: Bool { didSet { defaults.set(showDebugOverlay, forKey: Keys.debug) } }
+    /// Group consecutive frames into burst stacks (spec §4.4).
+    var stackBursts: Bool { didSet { defaults.set(stackBursts, forKey: Keys.stackBursts) } }
     /// RAW look: neutral render from sensor data (default) or the camera's embedded JPEG (film simulation, faster).
     var rawRendering: RawRendering { didSet { defaults.set(rawRendering.rawValue, forKey: Keys.rawRendering) } }
 
@@ -43,6 +45,7 @@ final class AppSettings {
         static let presets = "renamePresets"
         static let debug = "showDebugOverlay"
         static let rawRendering = "rawRendering"
+        static let stackBursts = "stackBursts"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -50,7 +53,7 @@ final class AppSettings {
         defaults.register(defaults: [
             Keys.pair: true, Keys.burst: 1.0, Keys.subfolders: false, Keys.subfolderWarn: 5000,
             Keys.slots: 2, Keys.pin: false, Keys.sync: true, Keys.finderTags: false,
-            Keys.cacheLimit: 5.0, Keys.thumbSize: 180.0, Keys.debug: false,
+            Keys.cacheLimit: 5.0, Keys.thumbSize: 180.0, Keys.debug: false, Keys.stackBursts: true,
         ])
         fileViewMode = defaults.string(forKey: Keys.fileView).flatMap(FileViewMode.init(rawValue:))
             ?? (defaults.bool(forKey: Keys.pair) ? .combined : .both)
@@ -64,6 +67,7 @@ final class AppSettings {
         cacheLimitGB = defaults.double(forKey: Keys.cacheLimit)
         thumbnailSize = defaults.double(forKey: Keys.thumbSize)
         showDebugOverlay = defaults.bool(forKey: Keys.debug)
+        stackBursts = defaults.bool(forKey: Keys.stackBursts)
         rawRendering = defaults.string(forKey: Keys.rawRendering).flatMap(RawRendering.init(rawValue:)) ?? .rendered
         if let d = defaults.data(forKey: Keys.presets), let p = try? JSONDecoder().decode([RenamePreset].self, from: d) {
             renamePresets = p
