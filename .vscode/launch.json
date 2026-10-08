@@ -1,0 +1,44 @@
+{
+  "configurations": [
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:mac-culler-app}/Packages/CullerKit",
+      "name": "Debug culler-bench (Packages/CullerKit)",
+      "target": "culler-bench",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug culler-bench (Packages/CullerKit)"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:mac-culler-app}/Packages/CullerKit",
+      "name": "Release culler-bench (Packages/CullerKit)",
+      "target": "culler-bench",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release culler-bench (Packages/CullerKit)"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:mac-culler-app}/Packages/CullerKit",
+      "name": "Debug culler-similar (Packages/CullerKit)",
+      "target": "culler-similar",
+      "configuration": "debug",
+      "preLaunchTask": "swift: Build Debug culler-similar (Packages/CullerKit)"
+    },
+    {
+      "type": "swift",
+      "request": "launch",
+      "args": [],
+      "cwd": "${workspaceFolder:mac-culler-app}/Packages/CullerKit",
+      "name": "Release culler-similar (Packages/CullerKit)",
+      "target": "culler-similar",
+      "configuration": "release",
+      "preLaunchTask": "swift: Build Release culler-similar (Packages/CullerKit)"
+    }
+  ]
+}

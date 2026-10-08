@@ -67,7 +67,7 @@ final class SlotImageLoader {
         // Whatever is in memory right now, in the same frame.
         if let p = pipeline.cachedPreview(files.primary, maxPixel: px) {
             setImage(p, full: false, t0: t0)
-        } else if let t = pipeline.cachedThumbnail(files.primary) {
+        } else if let t = pipeline.cachedThumbnail(for: files)?.image {
             setImage(t, full: false, t0: nil)
         } else if !sameItem {
             image = nil
@@ -76,7 +76,7 @@ final class SlotImageLoader {
         let pipeline = pipeline
         task = Task { [weak self] in
             async let size = Task.detached(priority: .userInitiated) { ImageDecoder.orientedPixelSize(of: files.fullResolutionSource.url) }.value
-            if self?.image == nil, let t = await pipeline.thumbnail(files.primary, priority: .veryHigh), !Task.isCancelled {
+            if self?.image == nil, let t = await pipeline.thumbnail(for: files, priority: .veryHigh), !Task.isCancelled {
                 if self?.image == nil { self?.setImage(t, full: false, t0: nil) }
             }
             let preview = await pipeline.preview(files.primary, maxPixel: px, priority: .veryHigh)

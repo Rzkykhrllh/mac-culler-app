@@ -30,7 +30,13 @@ public final class ImagePipeline: @unchecked Sendable {
     private let thumbMemory = NSCache<NSString, ImageBox>()
     private let previewMemory = NSCache<NSString, ImageBox>()
     private let fullMemory = NSCache<NSString, ImageBox>()
+    private let quickMemory = NSCache<NSString, ImageBox>()
     private let thumbLoads: LoadQueue
+    /// Tiny embedded thumbnails (≈1 ms) shown while the real thumbnail decodes.
+    private let quickLoads: LoadQueue
+    /// Core Image RAW renders are effectively serialized on the GPU; their own queue keeps them from
+    /// starving JPEG / embedded-preview thumbnails.
+    private let rawLoads: LoadQueue
     private let previewLoads: LoadQueue
     private let fullLoads: LoadQueue
     public let diskCache: ThumbnailDiskCache?
@@ -44,9 +50,31 @@ public final class ImagePipeline: @unchecked Sendable {
     }
 
     /// Cache key of a file's derived images under the current RAW rendering.
-    public func renderKey(_ file: FileRef) -> String {
-        file.kind.isRaw && rawRendering == .rendered ? file.cacheKey + "#rendered" : file.cacheKey
+    public func renderKey(_ file: FileRef) -> String { key(file, rawRendering) }
+
+    func key(_ file: FileRef, _ r: RawRendering) -> String {
+        file.kind.isRaw && r == .rendered ? file.cacheKey + "#rendered" : file.cacheKey
     }
+
+    /// File + look a photo's grid thumbnail is made from.
+    /// A RAW+JPEG pair uses the RAW's embedded camera preview: the same look as the JPEG, but ~6× faster
+    /// than decoding a 26 MP JPEG. Single RAWs follow the RAW-look setting; everything else decodes itself.
+    /// Until the RAW engine has warmed up (its first use costs ≈5 s), pairs decode the JPEG instead.
+    public func thumbnailSource(for item: ItemFiles) -> (file: FileRef, rendering: RawRendering) {
+        if item.isPair, let raw = item.raw {
+            return Self.rawEngineReady ? (raw, .embedded) : (item.primary, .embedded)
+        }
+        return (item.primary, item.primary.kind.isRaw ? rawRendering : .embedded)
+    }
+
+    /// Stable key of an item's final thumbnail (independent of which file of a pair produced it).
+    public func thumbnailKey(for item: ItemFiles) -> String {
+        if item.isPair, let raw = item.raw { return key(raw, .embedded) }
+        let s = thumbnailSource(for: item)
+        return key(s.file, s.rendering)
+    }
+
+    private func finalKeys(for item: ItemFiles) -> [String] { [thumbnailKey(for: item)] }
 
     private let statsLock = NSLock()
     private var _stats = Stats()
@@ -60,7 +88,10 @@ public final class ImagePipeline: @unchecked Sendable {
         thumbMemory.totalCostLimit = thumbnailMemoryBytes
         previewMemory.countLimit = previewCount
         fullMemory.countLimit = 2
+        quickMemory.countLimit = 4000
         thumbLoads = LoadQueue(name: "thumbnails", maxConcurrent: ProcessInfo.processInfo.activeProcessorCount)
+        quickLoads = LoadQueue(name: "quick", maxConcurrent: 4)
+        rawLoads = LoadQueue(name: "raw-render", maxConcurrent: 2)
         previewLoads = LoadQueue(name: "previews", maxConcurrent: 3)
         fullLoads = LoadQueue(name: "full", maxConcurrent: 1)
     }
@@ -101,6 +132,128 @@ public final class ImagePipeline: @unchecked Sendable {
 
     public func cancelThumbnail(_ file: FileRef) { thumbLoads.cancel(key: renderKey(file)) }
 
+    // MARK: Item thumbnails (progressive)
+
+    /// The best thumbnail already in memory for an item: final, else the camera preview, else the tiny one.
+    public func cachedThumbnail(for item: ItemFiles) -> (image: CGImage, isFinal: Bool)? {
+        let src = thumbnailSource(for: item)
+        for k in finalKeys(for: item) {
+            if let img = thumbMemory.object(forKey: k as NSString)?.image { return (img, true) }
+        }
+        if src.rendering == .rendered, let img = thumbMemory.object(forKey: key(src.file, .embedded) as NSString)?.image { return (img, false) }
+        if let img = quickMemory.object(forKey: quickSource(for: item).cacheKey as NSString)?.image { return (img, false) }
+        return nil
+    }
+
+    /// Loads an item's thumbnail progressively: `progress` receives quicker, lower-quality versions first
+    /// (tiny embedded thumbnail; camera preview while a True RAW render is pending). Returns the final image.
+    public func thumbnail(for item: ItemFiles, priority: Operation.QueuePriority = .high,
+                          progress: @escaping @Sendable (CGImage) -> Void = { _ in }) async -> CGImage? {
+        let src = thumbnailSource(for: item)
+        let finalKey = key(src.file, src.rendering)
+        for k in finalKeys(for: item) {
+            if let img = thumbMemory.object(forKey: k as NSString)?.image {
+                record { $0.thumbRequests += 1; $0.thumbMemoryHits += 1 }
+                return img
+            }
+        }
+        if item.isPair, let raw = item.raw {
+            let stable = key(raw, .embedded)
+            if diskCache?.contains(key: stable) != true, let q = await quickThumbnail(quickSource(for: item)) { progress(q) }
+            if Task.isCancelled { return nil }
+            // The source is chosen when the job runs: JPEG while the RAW engine is cold, its embedded preview after.
+            return await load(key: stable, queue: thumbLoads, priority: priority) { px in
+                Self.rawEngineReady
+                    ? ImageDecoder.thumbnail(for: raw, maxPixel: px, raw: .embedded)
+                    : ImageDecoder.thumbnail(for: item.primary, maxPixel: px, raw: .embedded)
+            }
+        }
+        if src.rendering == .rendered {
+            // Camera preview right away, True RAW render afterwards on its own queue.
+            if let e = await load(src.file, .embedded, queue: thumbLoads, priority: priority) { progress(e) }
+            if Task.isCancelled { return nil }
+            return await load(src.file, .rendered, queue: rawLoads, priority: priority)
+        }
+        let quick = quickSource(for: item)
+        if !quick.kind.isRaw || Self.rawEngineReady, diskCache?.contains(key: finalKey) != true, let q = await quickThumbnail(quick) {
+            progress(q)
+        }
+        if Task.isCancelled { return nil }
+        return await load(src.file, src.rendering, queue: thumbLoads, priority: priority)
+    }
+
+    /// File for the ≈1 ms placeholder: the raster file when there is one (needs no RAW engine).
+    private func quickSource(for item: ItemFiles) -> FileRef {
+        item.files.first { $0.kind.isRaster } ?? item.primary
+    }
+
+    /// ≈1 ms: the small thumbnail embedded in the file (160 px for camera JPEGs). Placeholder only.
+    func quickThumbnail(_ file: FileRef) async -> CGImage? {
+        let k = file.cacheKey
+        if let img = quickMemory.object(forKey: k as NSString)?.image { return img }
+        let img = await quickLoads.load(key: k, priority: .veryHigh) { ImageDecoder.embeddedThumbnail(for: file) }
+        if let img { quickMemory.setObject(ImageBox(img), forKey: k as NSString) }
+        return img
+    }
+
+    private func load(_ file: FileRef, _ rendering: RawRendering, queue: LoadQueue, priority: Operation.QueuePriority) async -> CGImage? {
+        await load(key: key(file, rendering), queue: queue, priority: priority) { px in
+            ImageDecoder.thumbnail(for: file, maxPixel: px, raw: rendering)
+        }
+    }
+
+    private func load(key k: String, queue: LoadQueue, priority: Operation.QueuePriority,
+                      decode: @escaping @Sendable (Int) -> CGImage?) async -> CGImage? {
+        record { $0.thumbRequests += 1 }
+        if let img = thumbMemory.object(forKey: k as NSString)?.image {
+            record { $0.thumbMemoryHits += 1 }
+            return img
+        }
+        let px = thumbnailPixelSize
+        let img = await queue.load(key: k, priority: priority) { [weak self] in
+            guard let self else { return nil }
+            if let d = self.diskCache?.read(key: k) {
+                self.record { $0.thumbDiskHits += 1 }
+                return d
+            }
+            guard let t = decode(px) else {
+                self.record { $0.failures += 1 }
+                return nil
+            }
+            self.record { $0.thumbGenerated += 1 }
+            self.diskCache?.write(t, key: k)
+            return t
+        }
+        if let img { thumbMemory.setObject(ImageBox(img), forKey: k as NSString, cost: img.bytesPerRow * img.height) }
+        return img
+    }
+
+    // MARK: Warm-up
+
+    private static let warmLock = NSLock()
+    nonisolated(unsafe) private static var warmed = false
+    nonisolated(unsafe) private static var _rawEngineReady = false
+    /// True once ImageIO's RAW support has been loaded in this process.
+    public static var rawEngineReady: Bool { warmLock.withLock { _rawEngineReady } }
+
+    /// The first RAW a process touches pays a one-time cost (≈5 s for ImageIO's RAW support, ≈7 s for the
+    /// first Core Image RAW render on an M2). Paying it in the background right after a folder opens means
+    /// the first photo the user looks at is fast.
+    public static func warmUpRaw(with file: FileRef) {
+        guard file.kind.isRaw else { return }
+        let first = warmLock.withLock { () -> Bool in
+            if warmed { return false }
+            warmed = true
+            return true
+        }
+        guard first else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            _ = ImageDecoder.thumbnail(for: file, maxPixel: 64, raw: .embedded)
+            warmLock.withLock { _rawEngineReady = true }
+        }
+        DispatchQueue.global(qos: .utility).async { _ = ImageDecoder.thumbnail(for: file, maxPixel: 64, raw: .rendered) }
+    }
+
     // MARK: Screen previews
 
     private func previewKey(_ file: FileRef, _ maxPixel: Int) -> String { "\(renderKey(file))#\(maxPixel)" }
@@ -117,7 +270,8 @@ public final class ImagePipeline: @unchecked Sendable {
             return img
         }
         let raw = rawRendering
-        let img = await previewLoads.load(key: key, priority: priority) { [weak self] in
+        let queue = file.kind.isRaw && raw == .rendered ? rawLoads : previewLoads
+        let img = await queue.load(key: key, priority: priority) { [weak self] in
             let t0 = DispatchTime.now()
             let img = ImageDecoder.preview(for: file, maxPixel: maxPixel, raw: raw)
             let ms = Double(DispatchTime.now().uptimeNanoseconds - t0.uptimeNanoseconds) / 1e6
@@ -137,6 +291,7 @@ public final class ImagePipeline: @unchecked Sendable {
     public func prefetchPreviews(_ files: [FileRef], maxPixel: Int) {
         let keys = Set(files.map { previewKey($0, maxPixel) })
         previewLoads.cancelAll(except: keys)
+        rawLoads.cancelAll(except: keys.union(rawThumbKeysInFlight()))
         for f in files where cachedPreview(f, maxPixel: maxPixel) == nil {
             Task.detached(priority: .utility) { [weak self] in
                 _ = await self?.preview(f, maxPixel: maxPixel, priority: .normal)
@@ -165,7 +320,11 @@ public final class ImagePipeline: @unchecked Sendable {
         return img
     }
 
+    /// Rendered RAW thumbnails share the RAW queue with previews; prefetch must not cancel them.
+    private func rawThumbKeysInFlight() -> Set<String> { rawLoads.keys.filter { !$0.contains("#rendered#") } }
+
     public func clearMemory() {
+        quickMemory.removeAllObjects()
         thumbMemory.removeAllObjects()
         previewMemory.removeAllObjects()
         fullMemory.removeAllObjects()
@@ -201,6 +360,8 @@ final class LoadQueue: @unchecked Sendable {
     private let queue = OperationQueue()
     private let lock = NSLock()
     private var inflight: [String: Entry] = [:]
+
+    var keys: Set<String> { lock.withLock { Set(inflight.keys) } }
 
     init(name: String, maxConcurrent: Int) {
         queue.name = "PhotoCuller.\(name)"
@@ -314,6 +475,10 @@ public final class ThumbnailDiskCache: @unchecked Sendable {
         let digest = SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
         return directory.appendingPathComponent(String(digest.prefix(2)), isDirectory: true)
             .appendingPathComponent(digest).appendingPathExtension("jpg")
+    }
+
+    public func contains(key: String) -> Bool {
+        FileManager.default.fileExists(atPath: fileURL(key).path)
     }
 
     public func read(key: String) -> CGImage? {
