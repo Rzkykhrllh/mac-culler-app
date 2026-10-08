@@ -212,6 +212,10 @@ struct StatusBar: View {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: compact ? 40 : 70).controlSize(.small)
                 if !compact { Chip(text: "Indexing \(p.done)/\(p.total)") }
             }
+            if let p = session.similarityProgress {
+                ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: compact ? 40 : 70).controlSize(.small)
+                if !compact { Chip(systemImage: "sparkles", text: "Finding similar \(p.done)/\(p.total)") }
+            }
             if let p = session.fileOperation {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70).controlSize(.small)
                 Chip(text: "\(p.title) \(p.done)/\(p.total)")

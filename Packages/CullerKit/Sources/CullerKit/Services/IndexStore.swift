@@ -58,6 +58,14 @@ public final class IndexStore: Sendable {
                 t.column("error", .text)
             }
         }
+        m.registerMigration("v2-featurePrints") { db in
+            try db.create(table: "featurePrint") { t in
+                t.primaryKey("path", .text)
+                t.column("size", .integer).notNull()
+                t.column("mtime", .double).notNull()
+                t.column("data", .blob).notNull()
+            }
+        }
         return m
     }
 
@@ -104,6 +112,34 @@ public final class IndexStore: Sendable {
                 guard let data = try? Self.encoder.encode(e) else { continue }
                 try db.execute(sql: "INSERT OR REPLACE INTO exif (path, size, mtime, json) VALUES (?, ?, ?, ?)",
                                arguments: [f.path, f.size, f.modificationDate.timeIntervalSince1970, data])
+            }
+        }
+    }
+
+    // MARK: Feature prints (similarity)
+
+    /// Archived Vision feature prints for files whose size + mtime still match. Keyed by path.
+    public func cachedFeaturePrints(for files: [FileRef]) -> [String: Data] {
+        guard !files.isEmpty else { return [:] }
+        let wanted = Dictionary(files.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
+        var out: [String: Data] = [:]
+        try? db.read { db in
+            for row in try Self.fetch(db, table: "featurePrint", columns: "path, size, mtime, data", key: "path", values: Array(wanted.keys)) {
+                let path: String = row["path"]
+                guard let f = wanted[path], f.size == row["size"] as Int64,
+                      abs(f.modificationDate.timeIntervalSince1970 - (row["mtime"] as Double)) < 0.001 else { continue }
+                out[path] = row["data"] as Data
+            }
+        }
+        return out
+    }
+
+    public func storeFeaturePrints(_ entries: [(FileRef, Data)]) {
+        guard !entries.isEmpty else { return }
+        try? db.write { db in
+            for (f, d) in entries {
+                try db.execute(sql: "INSERT OR REPLACE INTO featurePrint (path, size, mtime, data) VALUES (?, ?, ?, ?)",
+                               arguments: [f.path, f.size, f.modificationDate.timeIntervalSince1970, d])
             }
         }
     }
@@ -186,6 +222,7 @@ public final class IndexStore: Sendable {
     public func removeAll() {
         try? db.write { db in
             try db.execute(sql: "DELETE FROM exif")
+            try db.execute(sql: "DELETE FROM featurePrint")
             try db.execute(sql: "DELETE FROM itemMeta")
         }
     }

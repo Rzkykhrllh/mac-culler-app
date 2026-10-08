@@ -39,6 +39,16 @@ private struct GeneralSettings: View {
                 app.session?.rebuildStacks()
                 app.session?.rebuildDisplay()
             }
+            Picker("Stacks", selection: Binding(get: { app.stackChoice }, set: { app.setStackChoice($0) })) {
+                ForEach(StackChoice.allCases) { Text($0.title).tag($0) }
+            }
+            LabeledContent("Similarity") {
+                HStack {
+                    Text("Strict").font(.caption).foregroundStyle(.secondary)
+                    Slider(value: Binding(get: { s.similarityThreshold }, set: { app.setSimilarityThreshold($0) }), in: 0.15...0.9)
+                    Text("Loose").font(.caption).foregroundStyle(.secondary)
+                }
+            }
             Toggle("Include subfolders by default", isOn: $s.includeSubfoldersByDefault)
             Stepper("Warn when a subfolder scan exceeds \(s.subfolderWarningThreshold.formatted()) photos",
                     value: $s.subfolderWarningThreshold, in: 500...100_000, step: 500)

@@ -2,8 +2,15 @@ import Foundation
 import CullerKit
 
 extension FolderSession {
-    /// Recomputes burst stacks from capture time + camera body (spec §4.4).
-    func rebuildStacks() {
+    /// Recomputes stacks, keeping the cached similarity distances (threshold slider), then the display list.
+    func regroup(keepPrepared: Bool = false) {
+        rebuildStacks(keepPrepared: keepPrepared)
+        rebuildDisplay()
+    }
+
+    /// Recomputes stacks: burst timing + camera body (spec §4.4), or visual similarity.
+    func rebuildStacks(keepPrepared: Bool = false) {
+        if !keepPrepared { similarityPrepared = nil }
         let previousExpanded = expandedStacks.compactMap { stackMembers[$0] }
         let mode = fileView
         guard settings.stackBursts else {
@@ -14,12 +21,25 @@ extension FolderSession {
         }
         // In the separate modes a JPEG and its RAW share the exact capture time; keying stacks by file type
         // keeps them from collapsing into one stack (only real bursts of the same type stack).
-        let inputs = items.values.filter { mode.shows($0.files) }.map { item -> StackBuilder.Input in
+        func groupKey(_ item: PhotoItem) -> String {
             var key = item.exif?.bodyKey ?? "unknown"
             if !mode.pairs { key += item.files.primary.kind.isRaw ? "|raw" : "|raster" }
-            return StackBuilder.Input(id: item.id, captureDate: item.exif?.captureDate, bodyKey: key)
+            return key
         }
-        let groups = StackBuilder.build(inputs, threshold: settings.burstThreshold)
+        let visible = items.values.filter { mode.shows($0.files) }
+        let groups: [[String]]
+        if settings.groupingMode == .similarity {
+            if similarityPrepared == nil {
+                similarityPrepared = SimilarityGrouper.prepare(visible.map {
+                    .init(id: $0.id, captureDate: $0.exif?.captureDate, groupKey: groupKey($0), print: featurePrints[$0.id])
+                })
+            }
+            groups = SimilarityGrouper.groups(similarityPrepared!, threshold: Float(settings.similarityThreshold))
+        } else {
+            groups = StackBuilder.build(visible.map {
+                StackBuilder.Input(id: $0.id, captureDate: $0.exif?.captureDate, bodyKey: groupKey($0))
+            }, threshold: settings.burstThreshold)
+        }
         stackMembers = [:]
         stackOf = [:]
         for g in groups where g.count > 1 {

@@ -5,6 +5,50 @@ import CullerKit
 /// DEBUG-only smoke test driven through the real session (launch with `-openFolder <dir> -selfTest`).
 /// Exercises marking → background write → undo, stacks, filters, compare and rename planning inside the sandbox.
 enum DebugSelfTest {
+    /// `-openFolder <dir> -similarityTest`: similarity grouping on real photos, logs the groups by file name.
+    static func runSimilarity(_ s: FolderSession) async {
+        var failures: [String] = []
+        func check(_ ok: Bool, _ what: String) {
+            Log.session.info("SIMTEST \(ok ? "ok  " : "FAIL", privacy: .public) \(what, privacy: .public)")
+            if !ok { failures.append(what) }
+        }
+        while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        let saved = (s.settings.stackBursts, s.settings.groupingMode, s.settings.similarityThreshold)
+        defer {
+            s.settings.stackBursts = saved.0
+            s.settings.groupingMode = saved.1
+            s.app.setSimilarityThreshold(saved.2)
+        }
+        s.app.setSimilarityThreshold(0.45)
+        let t0 = Date()
+        s.app.setStackChoice(.similar)
+        try? await Task.sleep(for: .milliseconds(200))
+        while s.similarityTask != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        let visible = s.items.values.filter { s.fileView.shows($0.files) }.count
+        check(s.featurePrints.count == visible, "feature prints for all \(visible) photos in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+        func grouped() -> Int { s.stackMembers.values.reduce(0) { $0 + $1.count } }
+        let at45 = grouped()
+        check(!s.stackMembers.isEmpty, "similar stacks formed: \(s.stackMembers.count) stacks, \(at45) photos")
+        for members in s.stackMembers.values.sorted(by: { ($0.first ?? "") < ($1.first ?? "") }) {
+            Log.session.info("SIMTEST group \(members.map { ($0 as NSString).lastPathComponent.replacingOccurrences(of: ".JPG", with: "") }.joined(separator: " "), privacy: .public)")
+        }
+        let t1 = Date()
+        s.app.setSimilarityThreshold(0.2)
+        let strict = grouped()
+        s.app.setSimilarityThreshold(0.8)
+        let loose = grouped()
+        let ms = Date().timeIntervalSince(t1) * 1000
+        check(strict <= at45 && at45 <= loose, "stricter groups fewer photos (0.2: \(strict) ≤ 0.45: \(at45) ≤ 0.8: \(loose))")
+        check(ms < 200, "slider regroup is instant (\(Int(ms)) ms for two changes)")
+        // Second pass must come from the index cache.
+        s.featurePrints = [:]
+        let t2 = Date()
+        s.ensureFeaturePrints()
+        while s.similarityTask != nil { try? await Task.sleep(for: .milliseconds(20)) }
+        check(s.featurePrints.count == visible, "reopen: prints from cache in \(Int(Date().timeIntervalSince(t2) * 1000)) ms")
+        Log.session.info("SIMTEST \(failures.isEmpty ? "PASS" : "FAILED: \(failures)", privacy: .public)")
+    }
+
     static func run(_ s: FolderSession) async {
         var failures: [String] = []
         func check(_ ok: Bool, _ what: String) {
@@ -12,9 +56,16 @@ enum DebugSelfTest {
             if !ok { failures.append(what) }
         }
         while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
-        let userStacking = s.settings.stackBursts
-        if !userStacking { s.app.setStackBursts(true) }
-        defer { if !userStacking { s.app.setStackBursts(false) } }
+        // This test checks burst stacks; restore the user's exact stack settings afterwards.
+        let savedStacks = (s.settings.stackBursts, s.settings.groupingMode)
+        s.settings.stackBursts = true
+        s.settings.groupingMode = .time
+        s.regroup()
+        defer {
+            s.settings.stackBursts = savedStacks.0
+            s.settings.groupingMode = savedStacks.1
+            s.regroup()
+        }
 
         let sizes = s.stackMembers.values.map(\.count).sorted()
         check(!sizes.isEmpty, "stacks built: \(sizes)")

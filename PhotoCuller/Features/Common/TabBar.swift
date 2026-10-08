@@ -190,7 +190,7 @@ struct FileViewSwitcher: View {
     private var showsRawLook: Bool { session.fileView != .combined && session.fileView != .jpegOnly }
 
     private var modeBinding: Binding<FileViewMode> { Binding(get: { session.fileView }, set: { session.setFileView($0) }) }
-    private var stackBinding: Binding<Bool> { Binding(get: { app.settings.stackBursts }, set: { app.setStackBursts($0) }) }
+    private var stackBinding: Binding<StackChoice> { Binding(get: { app.stackChoice }, set: { app.setStackChoice($0) }) }
     private var rawBinding: Binding<RawRendering> { Binding(get: { app.settings.rawRendering }, set: { app.setRawRendering($0) }) }
 
     private func bar(compact: Bool) -> some View {
@@ -205,12 +205,19 @@ struct FileViewSwitcher: View {
             .fixedSize()
             .help("RAW + JPEG as one photo · separately · JPEG only · RAW only (⌥⌘1–4)")
 
-            Toggle(isOn: stackBinding) {
-                if compact { Image(systemName: "square.stack") } else { Label("Stacks", systemImage: "square.stack") }
+            Picker("", selection: stackBinding) {
+                ForEach(StackChoice.allCases) { c in
+                    if compact { Image(systemName: c.symbol).tag(c).help(c.title) } else { Text(c.title).tag(c) }
+                }
             }
-            .toggleStyle(.button)
+            .pickerStyle(.segmented)
+            .labelsHidden()
             .fixedSize()
-            .help("Group bursts into stacks (⇧S)")
+            .help("Stacks: off · burst timing · visually similar photos (⇧S on/off, ⌥S bursts ↔ similar)")
+
+            if app.stackChoice == .similar {
+                SimilarityControl()
+            }
 
             if showsRawLook {
                 Picker("", selection: rawBinding) {
@@ -237,7 +244,10 @@ struct FileViewSwitcher: View {
                 ForEach(FileViewMode.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.inline)
-            Toggle("Stack Bursts", isOn: stackBinding)
+            Picker("Stacks", selection: stackBinding) {
+                ForEach(StackChoice.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.inline)
             if showsRawLook {
                 Picker("RAW Look", selection: rawBinding) {
                     Text("True RAW").tag(RawRendering.rendered)
@@ -254,5 +264,39 @@ struct FileViewSwitcher: View {
         .padding(.vertical, 3)
         .glassCapsule()
         .fixedSize()
+    }
+}
+
+/// Strict ↔ loose slider for similarity stacks; regrouping is instant (distances are cached).
+struct SimilarityControl: View {
+    @Environment(AppModel.self) private var app
+    @State private var open = false
+
+    var body: some View {
+        Button { open.toggle() } label: {
+            Image(systemName: "slider.horizontal.3")
+        }
+        .buttonStyle(.borderless)
+        .help("How similar photos must be to stack (⌥[ stricter · ⌥] looser)")
+        .popover(isPresented: $open, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Similar-photo stacks").font(.headline)
+                HStack {
+                    Text("Strict").font(.caption).foregroundStyle(.secondary)
+                    Slider(value: Binding(get: { app.settings.similarityThreshold }, set: { app.setSimilarityThreshold($0) }), in: 0.15...0.9)
+                        .frame(width: 200)
+                    Text("Loose").font(.caption).foregroundStyle(.secondary)
+                }
+                if let s = app.session {
+                    Text("\(s.stackMembers.count) stacks · \(s.stackMembers.values.reduce(0) { $0 + $1.count }) photos grouped")
+                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                }
+                Text("Strict keeps only near-identical frames together; loose also joins different angles of the same scene. Photos more than 10 minutes apart or from different cameras never stack.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(width: 300, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(14)
+        }
     }
 }

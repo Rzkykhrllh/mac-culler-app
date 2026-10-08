@@ -24,6 +24,7 @@
 		501A4CBFDEE5286E37AAA91F /* PhotoContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA11F099D76108D79CC03241 /* PhotoContextMenu.swift */; };
 		5046B573401AE35A47AD4EF2 /* ThumbnailCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3B22C1C607B8B0DA285492 /* ThumbnailCell.swift */; };
 		55BFBD6774FDF00808C04C2C /* CullerKit in Frameworks */ = {isa = PBXBuildFile; productRef = B43CE62A7298C2877484F302 /* CullerKit */; };
+		5DA5A0FF694285A4C5431A80 /* FolderSession+Similarity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74CCC470E0969E590855D47B /* FolderSession+Similarity.swift */; };
 		5E5484A6D10D4B2F6D296633 /* CompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58C43139E1E31972F529FCD1 /* CompareView.swift */; };
 		65282DCF055E487AA3803BBD /* PhotoCullerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0465FF44B707A61CE518A4D /* PhotoCullerApp.swift */; };
 		6EA2549E8226FECD77C4024D /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DC4D0EC66E010A702889F5E /* WelcomeView.swift */; };
@@ -70,6 +71,7 @@
 		617E518A121A2989ED623172 /* FolderSession+Marking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FolderSession+Marking.swift"; sourceTree = "<group>"; };
 		61AC82EF33DEB9AB4C3B51AB /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
 		6FEE4D20BC4D260700BECBB4 /* LoupeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoupeView.swift; sourceTree = "<group>"; };
+		74CCC470E0969E590855D47B /* FolderSession+Similarity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FolderSession+Similarity.swift"; sourceTree = "<group>"; };
 		7D2831736F5B661614939ECD /* GridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridView.swift; sourceTree = "<group>"; };
 		7F38619D88E7762C952D8378 /* CompareState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareState.swift; sourceTree = "<group>"; };
 		83D900E6058C503A07C44DDF /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
@@ -223,6 +225,7 @@
 				FCFA2AD9A4D0195A9F635C58 /* FolderSession+FileOps.swift */,
 				3CFD91841A736D2057C95734 /* FolderSession+Keyboard.swift */,
 				617E518A121A2989ED623172 /* FolderSession+Marking.swift */,
+				74CCC470E0969E590855D47B /* FolderSession+Similarity.swift */,
 				426A995EFCF10C661F26943C /* FolderTree.swift */,
 				29192741C2FA2D7E675837CC /* PhotoItem.swift */,
 				BF85DB373F1760D7F0E921BA /* WorkspaceTab.swift */,
@@ -400,6 +403,7 @@
 				38A4090A38E5DA172CF8E5F0 /* FolderSession+FileOps.swift in Sources */,
 				483E1931AC3930C225572018 /* FolderSession+Keyboard.swift in Sources */,
 				3BC4A84C835AA5CEE9A5C30E /* FolderSession+Marking.swift in Sources */,
+				5DA5A0FF694285A4C5431A80 /* FolderSession+Similarity.swift in Sources */,
 				9CB819137B4259D73FED8101 /* FolderSession.swift in Sources */,
 				B4297B3A117FFBFCCD39669D /* FolderSidebarView.swift in Sources */,
 				B8813CD025D2CC05B125C1D1 /* FolderTree.swift in Sources */,

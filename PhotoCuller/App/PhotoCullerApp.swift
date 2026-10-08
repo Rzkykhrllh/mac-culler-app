@@ -18,6 +18,12 @@ struct PhotoCullerApp: App {
                     Log.session.info("Launch arguments: \(args, privacy: .public)")
                     if let i = args.firstIndex(of: "-openFolder"), args.indices.contains(i + 1) {
                         app.open(folder: URL(fileURLWithPath: args[i + 1]), securityScoped: false)
+                        if args.contains("-similarityTest") {
+                            Task {
+                                while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
+                                await DebugSelfTest.runSimilarity(app.session!)
+                            }
+                        }
                         if args.contains("-selfTest") {
                             Task {
                                 while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
@@ -81,7 +87,9 @@ struct ShortcutsHelpView: View {
                 row("Extend selection (grid)", "⇧ + ← → ↑ ↓  ·  ⇧/⌘-click  ·  drag")
                 row("Select all / deselect", "⌘A / ⇧⌘A")
                 row("Expand / collapse all stacks", "⌥⌘→ / ⌥⌘←")
-                row("Burst stacks on / off", "⇧S")
+                row("Stacks on / off", "⇧S")
+                row("Stacks by bursts ↔ similar photos", "⌥S")
+                row("Similarity stricter / looser", "⌥[ / ⌥]")
                 row("Expand / collapse a stack", "double-click it · S")
                 row("RAW+JPEG one · separate · JPEG · RAW", "⌥⌘1 / 2 / 3 / 4")
                 row("RAW look: True RAW ↔ camera preview", "⌥⌘R")
