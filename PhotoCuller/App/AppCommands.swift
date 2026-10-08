@@ -275,8 +275,10 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(replacing: .help) {
-            Button("Keyboard Shortcuts") { openWindow(id: "shortcuts") }
-                .keyboardShortcut("/", modifiers: .command)
+            Button("Keyboard Shortcuts") {
+                if let s = session { s.showShortcuts.toggle() } else { openWindow(id: "shortcuts") }
+            }
+            .keyboardShortcut("/", modifiers: .command)
         }
 
         CommandMenu("Debug") {

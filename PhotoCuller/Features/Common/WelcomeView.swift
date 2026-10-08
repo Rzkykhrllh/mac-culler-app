@@ -54,7 +54,13 @@ struct WelcomeView: View {
                 .padding(16)
                 .glassCard(18)
             }
-            Text("or drop a folder here").font(.caption).foregroundStyle(.tertiary)
+            HStack(spacing: 12) {
+                TipCard(symbol: "flag.fill", title: "Mark fast", text: "P pick · X reject · 1–5 stars · 6–9 labels. Hold ⇧ to jump to the next photo.")
+                TipCard(symbol: "rectangle.split.2x1", title: "Pick the keeper", text: "C compares a burst; drag photos from the filmstrip onto a side. B finds the sharpest.")
+                TipCard(symbol: "scope", title: "Check focus", text: "F focus peaking · J clipping · Y zooms to the eyes or animal at 100%.")
+            }
+            .frame(maxWidth: 760)
+            Text("Drop a folder here · press ? anytime for all shortcuts").font(.caption).foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(dropTargeted ? Color.accentColor.opacity(0.08) : Color.clear)
@@ -65,5 +71,21 @@ struct WelcomeView: View {
             app.open(folder: url)
             return true
         } isTargeted: { dropTargeted = $0 }
+    }
+}
+
+private struct TipCard: View {
+    let symbol: String
+    let title: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(title, systemImage: symbol).font(.headline).foregroundStyle(Theme.accent)
+            Text(text).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+        .glassCard(16)
     }
 }

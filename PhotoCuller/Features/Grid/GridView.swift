@@ -27,7 +27,8 @@ struct GridView: View {
                 session.viewMode = .loupe
             },
             onToggleStack: { session.toggleStack($0) },
-            contextMenu: { PhotoContextMenu.make(session) }
+            contextMenu: { PhotoContextMenu.make(session) },
+            onQuickMark: { id, cmd in session.apply(cmd, toItem: id) }
         )
         .overlay {
             if session.display.isEmpty && session.phase == .ready {

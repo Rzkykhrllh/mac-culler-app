@@ -25,6 +25,8 @@ struct ThumbnailCollection: NSViewRepresentable {
     var onToggleStack: (String) -> Void = { _ in }
     /// Right-click menu for the (already selected) items.
     var contextMenu: () -> NSMenu? = { nil }
+    /// Hover-bar action on one photo.
+    var onQuickMark: ((ItemID, MarkCommand) -> Void)?
 
     static let spacing: CGFloat = 4
     static let inset: CGFloat = 8
@@ -206,6 +208,7 @@ struct ThumbnailCollection: NSViewRepresentable {
                 }
             }
             cell.cellView.manualClicks = parent.style.isStrip
+            cell.cellView.onQuickMark = parent.onQuickMark.map { f in { cmd in f(id, cmd) } }
             if parent.style.isStrip {
                 cell.cellView.isSelectedCell = parent.selection.contains(id)
                 cell.cellView.onClick = { [weak self] in self?.parent.onSelectionChange([id], id) }

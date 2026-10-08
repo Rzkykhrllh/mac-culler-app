@@ -39,6 +39,15 @@ final class KeyboardController {
 
         guard let window = event.window, window === mainWindow, window.attachedSheet == nil else { return false }
         guard let session = AppModel.shared.session, session.phase == .ready, session.editingNote == nil else { return false }
+        // ? toggles the in-window shortcut sheet; Esc closes it.
+        if event.characters == "?" && !mods.contains(.command) {
+            session.showShortcuts.toggle()
+            return true
+        }
+        if session.showShortcuts && event.keyCode == KeyCode.escape {
+            session.showShortcuts = false
+            return true
+        }
         guard let match = KeyMap.match(event) else { return false }
         return session.perform(match)
     }

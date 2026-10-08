@@ -41,8 +41,18 @@ extension FolderSession {
     // MARK: Apply
 
     func apply(_ cmd: MarkCommand, advance: Bool = false) {
-        let targets = markTargets
+        apply(cmd, to: markTargets, advance: advance)
+    }
+
+    /// Hover-bar actions in the grid: one photo, selection untouched.
+    func apply(_ cmd: MarkCommand, toItem id: ItemID) {
+        guard let item = items[id] else { return }
+        apply(cmd, to: [item], advance: false)
+    }
+
+    private func apply(_ cmd: MarkCommand, to targets: [PhotoItem], advance: Bool) {
         guard !targets.isEmpty else { return }
+        showHUD(for: cmd, count: targets.count, result: targets.first?.metadata)
         var changes: [(id: ItemID, old: PhotoMetadata, new: PhotoMetadata)] = []
         for item in targets {
             ensureLoaded(item)
@@ -107,6 +117,9 @@ extension FolderSession {
 
     func undo() {
         guard let a = undoStack.popLast() else { return }
+        hud = MarkHUD(symbol: "arrow.uturn.backward", text: "Undo", detail: a.title, tint: .neutral)
+        hudTask?.cancel()
+        hudTask = Task { [weak self] in try? await Task.sleep(for: .milliseconds(700)); if !Task.isCancelled { self?.hud = nil } }
         switch a {
         case .metadata(let changes):
             setMetadata(changes.map { ($0.id, $0.old) })
@@ -120,6 +133,9 @@ extension FolderSession {
 
     func redo() {
         guard let a = redoStack.popLast() else { return }
+        hud = MarkHUD(symbol: "arrow.uturn.forward", text: "Redo", detail: a.title, tint: .neutral)
+        hudTask?.cancel()
+        hudTask = Task { [weak self] in try? await Task.sleep(for: .milliseconds(700)); if !Task.isCancelled { self?.hud = nil } }
         switch a {
         case .metadata(let changes):
             setMetadata(changes.map { ($0.id, $0.new) })
@@ -179,5 +195,42 @@ extension FolderSession {
 
     func selectAll() {
         selection = Set(display.map(\.itemID))
+    }
+}
+
+/// What the marking HUD shows.
+struct MarkHUD: Equatable {
+    var id = UUID()
+    var symbol: String?
+    var text: String
+    var detail: String?
+    var tint: HUDTint
+
+    enum HUDTint: Equatable { case neutral, pick, reject, star, label(ColorLabel) }
+}
+
+extension FolderSession {
+    /// Confirms a mark with a big, brief HUD (keyboard culling needs immediate feedback).
+    func showHUD(for cmd: MarkCommand, count: Int, result before: PhotoMetadata?) {
+        var h: MarkHUD
+        switch cmd {
+        case .flag(.pick): h = MarkHUD(symbol: "flag.fill", text: "Pick", tint: .pick)
+        case .flag(.reject): h = MarkHUD(symbol: "xmark.circle.fill", text: "Reject", tint: .reject)
+        case .flag(.none): h = MarkHUD(symbol: "flag.slash", text: "Unflagged", tint: .neutral)
+        case .rating(let r): h = MarkHUD(symbol: nil, text: r == 0 ? "No rating" : String(repeating: "★", count: r), tint: r == 0 ? .neutral : .star)
+        case .toggleLabel(let l):
+            let removing = count == 1 && before?.label == l
+            h = MarkHUD(symbol: removing ? "circle.slash" : "circle.fill", text: removing ? "Label removed" : "\(l.displayName) label", tint: removing ? .neutral : .label(l))
+        case .setLabel(let l): h = MarkHUD(symbol: l == .none ? "circle.slash" : "circle.fill", text: l == .none ? "No label" : "\(l.displayName) label", tint: l == .none ? .neutral : .label(l))
+        case .note: h = MarkHUD(symbol: "text.bubble.fill", text: "Note saved", tint: .neutral)
+        }
+        if count > 1 { h.detail = "\(count) photos" }
+        hud = h
+        hudTask?.cancel()
+        hudTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(850))
+            guard !Task.isCancelled else { return }
+            self?.hud = nil
+        }
     }
 }

@@ -113,12 +113,20 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
     var compact = false
     var onDoubleClick: (() -> Void)?
     var onStackBadge: (() -> Void)?
+    /// Hover bar actions (pick / reject / rating) — applied to this photo only.
+    var onQuickMark: ((MarkCommand) -> Void)?
     /// Filmstrips handle clicks themselves (click = pick on mouse-up) so a drag never changes the active slot.
     var manualClicks = false
     var onClick: (() -> Void)?
     private var stackBadgeRect: NSRect = .zero
     private var downPoint: NSPoint?
     private var dragStarted = false
+
+    // Hover
+    private var isHovered = false { didSet { if oldValue != isHovered { needsDisplay = true } } }
+    private var hoverPoint: NSPoint? { didSet { if hoverControl(at: hoverPoint) != hoverControl(at: oldValue) { needsDisplay = true } } }
+    private enum Control: Equatable { case pick, reject, star(Int) }
+    private var controlRects: [(Control, NSRect)] = []
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -133,6 +141,22 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         needsDisplay = true
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) { isHovered = true; hoverPoint = convert(event.locationInWindow, from: nil) }
+    override func mouseMoved(with event: NSEvent) { hoverPoint = convert(event.locationInWindow, from: nil) }
+    override func mouseExited(with event: NSEvent) { isHovered = false; hoverPoint = nil }
+
+    private func hoverControl(at p: NSPoint?) -> Control? {
+        guard let p else { return nil }
+        return controlRects.first { $0.1.contains(p) }?.0
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -161,6 +185,16 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
 
     override func mouseDown(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
+        if isHovered, let c = hoverControl(at: p), let item {
+            // Quick actions toggle, like the keys: clicking the current value clears it.
+            let m = item.metadata
+            switch c {
+            case .pick: onQuickMark?(.flag(m.flag == .pick ? .none : .pick))
+            case .reject: onQuickMark?(.flag(m.flag == .reject ? .none : .reject))
+            case .star(let n): onQuickMark?(.rating(m.rating == n ? 0 : n))
+            }
+            return
+        }
         if stackBadgeRect.contains(p), entry?.isStack == true {
             onStackBadge?()
             return
@@ -204,36 +238,45 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
 
     // MARK: Drawing
 
+    private static let star = NSColor(calibratedRed: 1, green: 0.8, blue: 0.3, alpha: 1)
+    private static let sharpGreen = NSColor(calibratedRed: 0.45, green: 1, blue: 0.55, alpha: 1)
+
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let b = bounds.insetBy(dx: compact ? 2 : 4, dy: compact ? 2 : 4)
+        let b = bounds.insetBy(dx: compact ? 2 : 3, dy: compact ? 2 : 3)
         let meta = item?.metadata ?? .empty
-
-        // Card: soft translucent gradient; stack members get a cool tint so a burst reads as a group.
         let radius: CGFloat = compact ? 7 : 10
         let card = NSBezierPath(roundedRect: b, xRadius: radius, yRadius: radius)
-        if entry?.isCollapsedStack == true {
-            // Layered "pile" look for collapsed stacks.
-            NSColor(white: 1, alpha: 0.05).setFill()
-            NSBezierPath(roundedRect: b.offsetBy(dx: 4, dy: -4).insetBy(dx: 2, dy: 0), xRadius: radius, yRadius: radius).fill()
-        }
-        var top = NSColor(white: 1, alpha: 0.075), bottom = NSColor(white: 1, alpha: 0.03)
-        if case .stackMember = entry?.kind {
-            top = Theme.nsAccentStart.withAlphaComponent(0.10)
-            bottom = Theme.nsAccentStart.withAlphaComponent(0.04)
-        }
-        if isSelectedCell || isCurrent {
-            top = NSColor(white: 1, alpha: 0.14)
-            bottom = NSColor(white: 1, alpha: 0.07)
-        }
-        NSGradient(starting: top, ending: bottom)?.draw(in: card, angle: -90)
+        controlRects = []
 
-        let inner = b.insetBy(dx: 6, dy: 6)
-        let imageArea = NSRect(x: inner.minX, y: inner.minY, width: inner.width, height: inner.height - (compact ? 0 : 14))
+        // Collapsed stack: a second card peeking out behind.
+        if entry?.isCollapsedStack == true {
+            NSColor(white: 1, alpha: 0.06).setFill()
+            NSBezierPath(roundedRect: b.insetBy(dx: 5, dy: 0).offsetBy(dx: 0, dy: -3), xRadius: radius, yRadius: radius).fill()
+        }
+
+        // Card fill: quiet by default, brighter on hover / selection; stack members share a warm tint.
+        var fill = NSColor(white: 1, alpha: 0.045)
+        if case .stackMember = entry?.kind { fill = Theme.nsAccentStart.withAlphaComponent(0.07) }
+        if isHovered { fill = NSColor(white: 1, alpha: 0.09) }
+        if isSelectedCell || isCurrent { fill = NSColor(white: 1, alpha: 0.13) }
+        fill.setFill()
+        card.fill()
+
+        // Photo, with a soft shadow, as large as the card allows.
+        let area = b.insetBy(dx: compact ? 4 : 6, dy: compact ? 4 : 6)
+        let r: NSRect
         if let image {
-            let r = aspectFit(CGSize(width: image.width, height: image.height), in: imageArea)
+            r = aspectFit(CGSize(width: image.width, height: image.height), in: area)
+            let path = CGPath(roundedRect: r, cornerWidth: compact ? 3 : 5, cornerHeight: compact ? 3 : 5, transform: nil)
             ctx.saveGState()
-            ctx.addPath(CGPath(roundedRect: r, cornerWidth: compact ? 3 : 5, cornerHeight: compact ? 3 : 5, transform: nil))
+            ctx.setShadow(offset: CGSize(width: 0, height: 2), blur: 6, color: NSColor(white: 0, alpha: 0.5).cgColor)
+            ctx.addPath(path)
+            ctx.setFillColor(NSColor.black.cgColor)
+            ctx.fillPath()
+            ctx.restoreGState()
+            ctx.saveGState()
+            ctx.addPath(path)
             ctx.clip()
             ctx.translateBy(x: 0, y: r.maxY + r.minY)
             ctx.scaleBy(x: 1, y: -1)
@@ -242,84 +285,215 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
             ctx.draw(image, in: r)
             ctx.restoreGState()
         } else {
-            let text = item?.decodeFailed == true ? "Unsupported\nformat" : ""
-            drawCentered(text, in: imageArea, size: 10, color: .secondaryLabelColor)
+            // Loading placeholder.
+            r = area.insetBy(dx: area.width * 0.12, dy: area.height * 0.18)
+            NSColor(white: 1, alpha: 0.04).setFill()
+            NSBezierPath(roundedRect: r, xRadius: 6, yRadius: 6).fill()
+            if item?.decodeFailed == true {
+                drawCentered("Unsupported\nformat", in: r, size: 10, color: .secondaryLabelColor)
+            } else {
+                drawSymbol("photo", centeredIn: r, color: NSColor(white: 1, alpha: 0.18), size: compact ? 14 : 22)
+            }
         }
 
-        // Color label strip (bottom edge).
-        if let c = labelColor(meta.label) {
-            c.setFill()
-            NSBezierPath(roundedRect: NSRect(x: b.minX + 6, y: b.maxY - 5, width: b.width - 12, height: 3), xRadius: 1.5, yRadius: 1.5).fill()
-        }
-
-        // Selection / current ring: warm gradient stroke.
+        // Border: selection gradient, else the color label, else a hairline.
         if isSelectedCell || isCurrent {
+            if isCurrent {
+                ctx.saveGState()
+                ctx.setShadow(offset: .zero, blur: 10, color: Theme.nsAccentEnd.withAlphaComponent(0.55).cgColor)
+                Theme.nsAccentEnd.withAlphaComponent(0.6).setStroke()
+                card.lineWidth = 1
+                card.stroke()
+                ctx.restoreGState()
+            }
             ctx.saveGState()
             ctx.addPath(card.cgPath)
             ctx.setLineWidth(isCurrent ? 3 : 2)
             ctx.replacePathWithStrokedPath()
             ctx.clip()
-            let alpha: CGFloat = isCurrent ? 1 : 0.65
+            let alpha: CGFloat = isCurrent ? 1 : 0.7
             NSGradient(starting: Theme.nsAccentStart.withAlphaComponent(alpha), ending: Theme.nsAccentEnd.withAlphaComponent(alpha))?
                 .draw(in: b, angle: -45)
             ctx.restoreGState()
+        } else if let c = labelColor(meta.label) {
+            c.withAlphaComponent(0.85).setStroke()
+            card.lineWidth = 2
+            card.stroke()
         } else {
             NSColor(white: 1, alpha: 0.06).setStroke()
             card.lineWidth = 1
             card.stroke()
         }
-        if let s = compareSlot {
-            drawBadge(["L", "R", "3", "4"][min(s, 3)], at: NSPoint(x: b.midX - 8, y: b.minY + 2), fill: Theme.nsAccentEnd)
-        }
 
-        // Flag badge (top-left).
+        let pad: CGFloat = compact ? 3 : 5
+        let showHoverBar = isHovered && !compact && image != nil && r.width > 110
+
+        // Top-left: flag, sharpest.
+        var x = r.minX + pad
         switch meta.flag {
-        case .pick: drawSymbol("flag.fill", at: NSPoint(x: inner.minX, y: inner.minY), color: .white)
-        case .reject: drawSymbol("xmark.circle.fill", at: NSPoint(x: inner.minX, y: inner.minY), color: .systemRed)
+        case .pick: x = pill(symbol: "flag.fill", color: .white, at: NSPoint(x: x, y: r.minY + pad)).maxX + 3
+        case .reject: x = pill(symbol: "xmark", color: NSColor(calibratedRed: 1, green: 0.35, blue: 0.35, alpha: 1), at: NSPoint(x: x, y: r.minY + pad)).maxX + 3
         case .none: break
         }
-
-        // Sharpest frame of its stack: a hint for picking the keeper.
         if item?.isSharpestInStack == true {
-            let x = inner.minX + (meta.flag == .none ? 0 : 22)
-            drawSymbol("scope", at: NSPoint(x: x, y: inner.minY), color: NSColor(calibratedRed: 0.45, green: 1, blue: 0.55, alpha: 1), size: compact ? 10 : 12)
+            pill(symbol: "scope", color: Self.sharpGreen, at: NSPoint(x: x, y: r.minY + pad))
+        }
+        // Top-right: RAW+JPG; compare slot.
+        if let item, item.files.isPair, !compact, r.width > 120 {
+            pill(text: item.files.badge, at: NSPoint(x: r.maxX - pad, y: r.minY + pad), alignRight: true)
+        }
+        if let s = compareSlot {
+            pill(text: ["L", "R", "3", "4"][min(s, 3)], at: NSPoint(x: r.midX - 8, y: r.minY + pad), fill: Theme.nsAccentEnd)
         }
 
-        // Pair badge (top-right).
-        if let item, item.files.isPair, !compact {
-            drawBadge(item.files.badge, at: NSPoint(x: inner.maxX, y: inner.minY), alignRight: true, fill: NSColor(white: 0, alpha: 0.55))
-        }
-
-        // Footer: stars, note, stack badge.
-        if !compact {
-            let footerY = b.maxY - 19
-            if meta.rating > 0 {
-                let stars = String(repeating: "★", count: meta.rating) + String(repeating: "·", count: 5 - meta.rating)
-                draw(stars, at: NSPoint(x: inner.minX, y: footerY), size: 10, color: NSColor(calibratedRed: 1, green: 0.8, blue: 0.3, alpha: 1))
-            }
-            if meta.hasNote {
-                drawSymbol("text.bubble.fill", at: NSPoint(x: inner.minX + 62, y: footerY - 1), color: .secondaryLabelColor, size: 10)
-            }
-            if case .failed = item?.writeState {
-                drawSymbol("exclamationmark.triangle.fill", at: NSPoint(x: inner.minX + 78, y: footerY - 1), color: .systemOrange, size: 10)
-            }
-        } else if meta.rating > 0 {
-            drawBadge(String(repeating: "★", count: meta.rating), at: NSPoint(x: inner.minX, y: inner.maxY - 14), fill: NSColor(white: 0, alpha: 0.5))
-        }
+        // Bottom-right: stack.
         stackBadgeRect = .zero
-        if let entry {
+        if let entry, !showHoverBar {
             var text: String?
             switch entry.kind {
-            case .collapsedStack(let m, let t): text = m == t ? "×\(t)" : "\(m)/\(t)"
+            case .collapsedStack(let m, let t): text = m == t ? "\(t)" : "\(m)/\(t)"
             case .stackMember(let p, let c): text = "\(p)/\(c)"
             case .single: break
             }
             if let text {
-                let pt = NSPoint(x: inner.maxX, y: compact ? inner.maxY - 14 : b.maxY - 21)
-                stackBadgeRect = drawBadge(text, at: pt, alignRight: true, fill: entry.isCollapsedStack ? Theme.nsAccentEnd.withAlphaComponent(0.9) : NSColor(white: 0.35, alpha: 0.85))
+                let collapsed = entry.isCollapsedStack
+                // Filmstrip cells are narrow: top-right (free there) so it never collides with the bottom info pill.
+                let y = compact ? r.minY + pad : r.maxY - pad - pillHeight
+                stackBadgeRect = pill(text: text, symbol: compact ? nil : "square.stack", at: NSPoint(x: r.maxX - pad, y: y), alignRight: true,
+                                      fill: collapsed ? Theme.nsAccentEnd.withAlphaComponent(0.92) : NSColor(white: 0.12, alpha: 0.78))
                     .insetBy(dx: -4, dy: -4)
             }
         }
+
+        // Bottom-left: label dot, stars, note, save problem.
+        if !showHoverBar {
+            var parts: [(String?, NSColor)] = []
+            if meta.label != .none, let c = labelColor(meta.label) { parts.append(("circle.fill", c)) }
+            if meta.rating > 0 { parts.append((nil, Self.star)) }
+            if meta.hasNote { parts.append(("text.bubble.fill", .white)) }
+            if case .failed = item?.writeState { parts.append(("exclamationmark.triangle.fill", .systemOrange)) }
+            if !parts.isEmpty {
+                drawInfoPill(parts, rating: meta.rating, at: NSPoint(x: r.minX + pad, y: r.maxY - pad - pillHeight))
+            }
+        } else {
+            drawHoverBar(in: r, meta: meta)
+        }
+    }
+
+    private var pillHeight: CGFloat { compact ? 13 : 17 }
+
+    /// Small dark rounded pill with an optional symbol and text. Returns its rect.
+    @discardableResult
+    private func pill(text: String? = nil, symbol: String? = nil, color: NSColor = .white, at p: NSPoint, alignRight: Bool = false,
+                      fill: NSColor = NSColor(white: 0.08, alpha: 0.72)) -> NSRect {
+        let h = pillHeight
+        let font = NSFont.systemFont(ofSize: compact ? 8.5 : 10, weight: .semibold)
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+        let textSize = text.map { ($0 as NSString).size(withAttributes: attrs) } ?? .zero
+        let img = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: compact ? 7.5 : 9, weight: .bold).applying(.init(paletteColors: [color]))) }
+        let iconW = img?.size.width ?? 0
+        let gap: CGFloat = (img != nil && text != nil) ? 3 : 0
+        var rect = NSRect(x: p.x, y: p.y, width: max(h, iconW + gap + textSize.width + (compact ? 8 : 11)), height: h)
+        if alignRight { rect.origin.x -= rect.width }
+        fill.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: h / 2, yRadius: h / 2).fill()
+        var cx = rect.minX + (rect.width - (iconW + gap + textSize.width)) / 2
+        if let img {
+            img.draw(in: NSRect(x: cx, y: rect.midY - img.size.height / 2, width: img.size.width, height: img.size.height),
+                     from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            cx += iconW + gap
+        }
+        if let text {
+            (text as NSString).draw(at: NSPoint(x: cx, y: rect.midY - textSize.height / 2), withAttributes: attrs)
+        }
+        return rect
+    }
+
+    private func drawInfoPill(_ parts: [(String?, NSColor)], rating: Int, at p: NSPoint) {
+        let h = pillHeight
+        let size: CGFloat = compact ? 7.5 : 9
+        var items: [NSImage] = []
+        for (sym, color) in parts {
+            if let sym, let i = NSImage(systemSymbolName: sym, accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: size, weight: .bold).applying(.init(paletteColors: [color]))) {
+                items.append(i)
+            } else if sym == nil, let s = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: size, weight: .bold).applying(.init(paletteColors: [color]))) {
+                // Small cells (filmstrip): one star + the number, so it never collides with the stack badge.
+                items += compact ? [s] : Array(repeating: s, count: rating)
+            }
+        }
+        let widths = items.map(\.size.width).reduce(0, +) + CGFloat(max(0, items.count - 1)) * 1.5
+        let rect = NSRect(x: p.x, y: p.y, width: widths + (compact ? 8 : 11), height: h)
+        let digit = compact && rating > 0 ? "\(rating)" as NSString : nil
+        let digitAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 8.5, weight: .bold), .foregroundColor: Self.star]
+        let digitW = digit.map { $0.size(withAttributes: digitAttrs).width + 2 } ?? 0
+        let full = NSRect(x: rect.minX, y: rect.minY, width: rect.width + digitW, height: rect.height)
+        NSColor(white: 0.08, alpha: 0.72).setFill()
+        NSBezierPath(roundedRect: full, xRadius: h / 2, yRadius: h / 2).fill()
+        var x = rect.minX + (compact ? 4 : 5.5)
+        for (k, i) in items.enumerated() {
+            i.draw(in: NSRect(x: x, y: rect.midY - i.size.height / 2, width: i.size.width, height: i.size.height),
+                   from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            x += i.size.width + 1.5
+            // The rating digit goes right after the star (stars come after an optional label dot).
+            if let digit, k == (parts.first?.0 == "circle.fill" ? 1 : 0) {
+                digit.draw(at: NSPoint(x: x - 0.5, y: rect.midY - 6), withAttributes: digitAttrs)
+                x += digitW
+            }
+        }
+    }
+
+    /// Hover: file name + clickable pick / reject / stars over a gradient at the bottom of the photo.
+    private func drawHoverBar(in r: NSRect, meta: PhotoMetadata) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let barH: CGFloat = min(52, r.height * 0.45)
+        let bar = NSRect(x: r.minX, y: r.maxY - barH, width: r.width, height: barH)
+        ctx.saveGState()
+        ctx.addPath(CGPath(roundedRect: r, cornerWidth: 5, cornerHeight: 5, transform: nil))
+        ctx.clip()
+        NSGradient(starting: NSColor(white: 0, alpha: 0), ending: NSColor(white: 0, alpha: 0.72))?.draw(in: bar, angle: 90)
+        ctx.restoreGState()
+
+        if let name = item?.fileName, r.width > 140 {
+            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 10, weight: .medium), .foregroundColor: NSColor(white: 1, alpha: 0.85)]
+            let s = name as NSString
+            s.draw(with: NSRect(x: r.minX + 7, y: bar.minY + 4, width: r.width - 14, height: 14),
+                   options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], attributes: attrs)
+        }
+
+        let hovered = hoverControl(at: hoverPoint)
+        let y = r.maxY - 21
+        let pickRect = NSRect(x: r.minX + 6, y: y, width: 18, height: 16)
+        let rejectRect = NSRect(x: pickRect.maxX + 2, y: y, width: 18, height: 16)
+        icon(meta.flag == .pick ? "flag.fill" : "flag", in: pickRect, color: meta.flag == .pick ? .white : NSColor(white: 1, alpha: hovered == .pick ? 1 : 0.6))
+        icon("xmark", in: rejectRect, color: meta.flag == .reject ? NSColor(calibratedRed: 1, green: 0.35, blue: 0.35, alpha: 1)
+             : NSColor(white: 1, alpha: hovered == .reject ? 1 : 0.6))
+        controlRects += [(.pick, pickRect), (.reject, rejectRect)]
+
+        // Stars: hovering previews the rating.
+        var preview = meta.rating
+        if case .star(let n) = hovered { preview = n }
+        let starW: CGFloat = 14
+        let startX = r.maxX - 6 - starW * 5
+        guard startX > rejectRect.maxX + 4 else { return }
+        for n in 1...5 {
+            let sr = NSRect(x: startX + CGFloat(n - 1) * starW, y: y, width: starW, height: 16)
+            icon(n <= preview ? "star.fill" : "star", in: sr, color: n <= preview ? Self.star : NSColor(white: 1, alpha: 0.5), size: 10)
+            controlRects.append((.star(n), sr))
+        }
+    }
+
+    private func icon(_ name: String, in r: NSRect, color: NSColor, size: CGFloat = 11) {
+        guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: size, weight: .bold).applying(.init(paletteColors: [color]))) else { return }
+        img.draw(in: NSRect(x: r.midX - img.size.width / 2, y: r.midY - img.size.height / 2, width: img.size.width, height: img.size.height),
+                 from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+    }
+
+    private func drawSymbol(_ name: String, centeredIn r: NSRect, color: NSColor, size: CGFloat) {
+        icon(name, in: r, color: color, size: size)
     }
 
     private func aspectFit(_ s: CGSize, in r: NSRect) -> NSRect {
@@ -340,9 +514,6 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
         }
     }
 
-    private func draw(_ s: String, at p: NSPoint, size: CGFloat, color: NSColor) {
-        (s as NSString).draw(at: p, withAttributes: [.font: NSFont.systemFont(ofSize: size, weight: .semibold), .foregroundColor: color])
-    }
 
     private func drawCentered(_ s: String, in r: NSRect, size: CGFloat, color: NSColor) {
         let style = NSMutableParagraphStyle()
@@ -352,25 +523,5 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
         (s as NSString).draw(in: NSRect(x: r.minX, y: r.midY - h / 2, width: r.width, height: h), withAttributes: attrs)
     }
 
-    @discardableResult
-    private func drawBadge(_ s: String, at p: NSPoint, alignRight: Bool = false, fill: NSColor) -> NSRect {
-        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: NSColor.white]
-        let size = (s as NSString).size(withAttributes: attrs)
-        var r = NSRect(x: p.x, y: p.y, width: size.width + 10, height: 15)
-        if alignRight { r.origin.x -= r.width }
-        fill.setFill()
-        NSBezierPath(roundedRect: r, xRadius: 7.5, yRadius: 7.5).fill()
-        (s as NSString).draw(at: NSPoint(x: r.minX + 5, y: r.minY + (15 - size.height) / 2), withAttributes: attrs)
-        return r
-    }
 
-    private func drawSymbol(_ name: String, at p: NSPoint, color: NSColor, size: CGFloat = 12) {
-        guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: size, weight: .bold).applying(.init(paletteColors: [color]))) else { return }
-        // Dark backdrop for legibility on bright photos.
-        NSColor(white: 0, alpha: 0.45).setFill()
-        let r = NSRect(origin: p, size: img.size).insetBy(dx: -2, dy: -2)
-        NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4).fill()
-        img.draw(in: NSRect(origin: p, size: img.size), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
-    }
 }

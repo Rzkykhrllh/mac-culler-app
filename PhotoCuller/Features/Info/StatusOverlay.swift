@@ -19,19 +19,24 @@ struct StatusOverlay: View {
 
     private func card(detail: Int) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            MarksView(metadata: item.metadata, writeState: item.writeState)
-            if !minimal, detail >= 1 {
-                HStack(spacing: 10) {
+            // Marks + name + position on one line, EXIF below: compact, so it covers less of the photo.
+            HStack(spacing: 10) {
+                MarksView(metadata: item.metadata, writeState: item.writeState)
+                if !minimal, detail >= 1 {
+                    Rectangle().fill(.white.opacity(0.2)).frame(width: 1, height: 12)
                     Text(item.fileName).fontWeight(.semibold).lineLimit(1)
                     Text(kindBadge).font(.caption2.weight(.semibold)).padding(.horizontal, 5).padding(.vertical, 1)
                         .background(.white.opacity(0.15), in: Capsule())
                     if showsPosition, let i = session.currentIndex, item.id == session.currentID {
-                        Text("\(i + 1) / \(session.display.count)").foregroundStyle(.secondary)
+                        Text("\(i + 1) / \(session.display.count)").foregroundStyle(.secondary).monospacedDigit()
+                    }
+                    if item.isSharpestInStack {
+                        Image(systemName: "scope").foregroundStyle(.green).help("Sharpest frame of its stack")
                     }
                 }
-                .font(.caption)
-                .fixedSize()
             }
+            .font(.caption)
+            .fixedSize()
             if detail >= 2, let e = item.exif {
                 Text(ExifFormat.summary(e)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     .lineLimit(1).fixedSize()
@@ -41,7 +46,7 @@ struct StatusOverlay: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.vertical, 8)
         .glassCard(14)
         .foregroundStyle(.white)
         .fixedSize(horizontal: true, vertical: false)
