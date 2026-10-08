@@ -204,6 +204,15 @@ enum DebugSelfTest {
             }
             try? await Task.sleep(for: .milliseconds(300))
             let lit = cells(content).filter(\.isPartnerHighlighted).compactMap { $0.item?.fileName }
+            // Several JPGs selected: every one of their RAWs is marked.
+            let jpgs = s.display.compactMap { s.items[$0.itemID] }.filter { $0.files.primary.kind == .jpeg && s.partner(of: $0.id) != nil }.prefix(3).map(\.id)
+            s.selection = Set(jpgs)
+            try? await Task.sleep(for: .milliseconds(400))
+            let litMulti = cells(content).filter(\.isPartnerHighlighted).compactMap { $0.item?.id }
+            let want = Set(jpgs.compactMap { s.partner(of: $0) })
+            let visibleWant = want.filter { id in cells(content).contains { $0.item?.id == id } }
+            Log.session.info("SNAP \(Set(litMulti) == visibleWant ? "ok  " : "FAIL", privacy: .public) multi-select pairs: \(litMulti.count, privacy: .public) marked, \(visibleWant.count, privacy: .public) expected on screen")
+            if let c = s.currentID { s.selection = [c] }
             Log.session.info("SNAP current \(s.currentItem?.fileName ?? "?", privacy: .public), hovered \(jpgCell.item?.fileName ?? "?", privacy: .public), pair: \(lit, privacy: .public)")
             snap("separate-hover")
             if let exit = NSEvent.enterExitEvent(with: .mouseExited, location: p, modifierFlags: [], timestamp: 0, windowNumber: w.windowNumber,
