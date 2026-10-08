@@ -68,6 +68,12 @@ struct PhotoCullerApp: App {
         }
         .defaultSize(width: 600, height: 420)
 
+        Window("About \(AppConstants.appName)", id: "about") {
+            AboutView()
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
+
         Window("Keyboard Shortcuts", id: "shortcuts") {
             ShortcutsHelpView()
         }

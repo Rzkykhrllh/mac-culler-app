@@ -8,11 +8,12 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }
+            AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }
             CompareSettings().tabItem { Label("Compare", systemImage: "rectangle.split.2x1") }
             CacheSettings().tabItem { Label("Cache", systemImage: "internaldrive") }
             RenamePresetsSettings().tabItem { Label("Rename", systemImage: "pencil") }
         }
-        .frame(width: 520, height: 380)
+        .frame(width: 540, height: 420)
     }
 }
 
@@ -56,6 +57,67 @@ private struct GeneralSettings: View {
                 .onChange(of: s.syncFinderTags) { app.applyWriteOptions() }
             Text("Only the app’s own color tags (Red, Yellow, Green, Blue, Purple) are added or removed; other tags are never touched.")
                 .font(.caption).foregroundStyle(.secondary)
+        }
+        .formStyle(.grouped)
+    }
+}
+
+struct AppearanceSettings: View {
+    @Bindable private var theme = ThemeStore.shared
+
+    var body: some View {
+        Form {
+            Section("Accent color") {
+                HStack(spacing: 14) {
+                    ForEach(AccentPalette.allCases) { p in
+                        let (a, b) = p.colors
+                        Button { theme.accent = p } label: {
+                            VStack(spacing: 5) {
+                                Circle()
+                                    .fill(LinearGradient(colors: [Color(nsColor: a), Color(nsColor: b)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 30, height: 30)
+                                    .overlay(Circle().stroke(Color.white, lineWidth: theme.accent == p ? 2 : 0).padding(-4))
+                                Text(p.title).font(.caption).foregroundStyle(theme.accent == p ? .primary : .secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .help("\(p.title) accent: selection outlines, active buttons, highlights")
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            Section("Background") {
+                HStack(spacing: 10) {
+                    ForEach(BackdropStyle.allCases) { b in
+                        Button { theme.backdrop = b } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(LinearGradient(colors: b.stops, startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(height: 44)
+                                    .overlay(alignment: .bottomLeading) {
+                                        Capsule().fill(Theme.accent).frame(width: 26, height: 6).padding(8)
+                                    }
+                                    .overlay(RoundedRectangle(cornerRadius: 8)
+                                        .stroke(theme.backdrop == b ? Color.white : Color.white.opacity(0.12), lineWidth: theme.backdrop == b ? 2 : 1))
+                                Text(b.title).font(.caption.weight(.medium))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .help(b.subtitle)
+                    }
+                }
+                .padding(.vertical, 4)
+                Text(theme.backdrop.subtitle).font(.caption).foregroundStyle(.secondary)
+                Toggle("Soft glow in the window corners", isOn: $theme.glow)
+            }
+            Section {
+                HStack {
+                    Text("The interface stays dark on purpose: a bright surround changes how exposure and color look in photos.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Reset") { theme.reset() }
+                }
+            }
         }
         .formStyle(.grouped)
     }

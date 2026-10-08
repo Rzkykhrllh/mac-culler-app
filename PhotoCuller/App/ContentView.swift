@@ -173,6 +173,15 @@ struct SessionToolbar: ToolbarContent {
     @Bindable var session: FolderSession
 
     var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .navigation) {
+            let _ = session.undoRevision   // re-evaluate when the undo stacks change
+            Button { session.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
+                .disabled(!session.canUndo)
+                .help(session.canUndo ? "Undo \(session.undoStack.last!.title) (⌘Z)" : "Nothing to undo (⌘Z)")
+            Button { session.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
+                .disabled(!session.canRedo)
+                .help(session.canRedo ? "Redo \(session.redoStack.last!.title) (⇧⌘Z)" : "Nothing to redo (⇧⌘Z)")
+        }
         ToolbarItem(placement: .principal) {
             ChoiceBar(options: ViewMode.allCases.map { .init(value: $0, title: $0.title, symbol: $0.symbol, help: Explain.viewMode($0)) },
                       selection: Binding(get: { session.viewMode }, set: { m in

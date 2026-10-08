@@ -134,6 +134,7 @@ struct PathBar: View {
                     }
                 }
             }
+            SubfolderToggle(session: session)
         }
         .padding(.horizontal, 12)
         .frame(height: 30)
@@ -165,6 +166,27 @@ struct PathBar: View {
             u = p
         }
         return parts
+    }
+}
+
+/// On: the folder and every folder inside it (all levels) are scanned as one shoot.
+struct SubfolderToggle: View {
+    @Environment(AppModel.self) private var app
+    let session: FolderSession
+
+    var body: some View {
+        let on = session.includeSubfolders
+        Button { app.reopenCurrent(includeSubfolders: !on) } label: {
+            Label("Subfolders", systemImage: on ? "folder.fill.badge.plus" : "folder.badge.plus")
+                .font(.system(size: 11, weight: on ? .semibold : .regular))
+                .foregroundStyle(on ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(on ? Theme.accentStart.opacity(0.14) : Color.white.opacity(0.06), in: Capsule())
+                .fixedSize()
+        }
+        .buttonStyle(.plain)
+        .help(on ? "Showing photos from this folder and every folder inside it. Click to show only this folder (⌥⌘I)."
+                 : "Show only this folder. Click to also include every folder inside it, all levels deep (⌥⌘I).")
     }
 }
 

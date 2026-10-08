@@ -1,4 +1,5 @@
 #if DEBUG
+import SwiftUI
 import AppKit
 import CullerKit
 
@@ -230,6 +231,33 @@ enum DebugSelfTest {
             snapSheet("guide-3")
             s.app.showGuide = false
         }
+        // Another theme (restored right after: these are the user's real settings).
+        let theme = ThemeStore.shared
+        let savedTheme = (theme.accent, theme.backdrop, theme.glow)
+        theme.accent = .ocean; theme.backdrop = .slate
+        try? await Task.sleep(for: .milliseconds(800))
+        snap("theme-ocean-slate")
+        theme.accent = .mint; theme.backdrop = .midnight
+        try? await Task.sleep(for: .milliseconds(800))
+        snap("theme-mint-midnight")
+        (theme.accent, theme.backdrop, theme.glow) = savedTheme
+        // About + Appearance, rendered off-screen.
+        func render<V: View>(_ v: V, _ n: String) async {
+            let host = NSHostingView(rootView: v.environment(\.colorScheme, .dark))
+            let win = NSWindow(contentRect: NSRect(origin: NSPoint(x: -3000, y: 0), size: host.fittingSize), styleMask: [.borderless], backing: .buffered, defer: false)
+            win.appearance = NSAppearance(named: .darkAqua)
+            win.contentView = host
+            win.orderFrontRegardless()
+            try? await Task.sleep(for: .milliseconds(600))
+            host.layoutSubtreeIfNeeded()
+            if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                host.cacheDisplay(in: host.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(n + ".png"))
+            }
+            win.orderOut(nil)
+        }
+        await render(AboutView(), "about")
+        await render(AppearanceSettings().frame(width: 540, height: 420).background(Color(white: 0.12)), "appearance")
         // Undo the demo marks.
         for _ in 0..<(cmds.count + 1) { s.undo() }
         try? await Task.sleep(for: .milliseconds(1500))

@@ -284,12 +284,19 @@ struct AppCommands: Commands {
                 .keyboardShortcut("y", modifiers: [.command, .shift])
         }
 
+        CommandGroup(replacing: .appInfo) {
+            Button("About \(AppConstants.appName)") { openWindow(id: "about") }
+        }
+
         CommandGroup(replacing: .help) {
             Button("Getting Started") { app.showGuide = true }
             Button("Keyboard Shortcuts") {
                 if let s = session { s.showShortcuts.toggle() } else { openWindow(id: "shortcuts") }
             }
             .keyboardShortcut("/", modifiers: .command)
+            Divider()
+            Button("About the Developer…") { openWindow(id: "about") }
+            Button("Visit dev.byairu.com") { NSWorkspace.shared.open(AboutView.website) }
         }
 
         CommandMenu("Debug") {
