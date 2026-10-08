@@ -127,12 +127,49 @@ public enum XMPCodec {
     public static func mergedSidecarData(existing: Data?, metadata m: PhotoMetadata, url: URL) throws -> Data {
         var base: CGImageMetadata?
         if let existing, !existing.isEmpty {
-            guard let parsed = CGImageMetadataCreateFromXMPData(existing as CFData) else { throw XMPError.invalidSidecar(url) }
-            base = parsed
+            if let parsed = CGImageMetadataCreateFromXMPData(existing as CFData) {
+                base = parsed
+            } else if !isEmptyPacket(existing) {
+                // Never overwrite content we cannot parse.
+                throw XMPError.invalidSidecar(url)
+            }
         }
         let mm = merged(base, with: m)
+        let hasTags = ((CGImageMetadataCopyTags(mm) as? [CGImageMetadataTag]) ?? []).isEmpty == false
+        guard hasTags else { return emptyPacket }
         guard let data = CGImageMetadataCreateXMPData(mm, nil) as Data? else { throw XMPError.serializationFailed }
         return data
+    }
+
+    /// A packet without any property. ImageIO can neither parse nor produce one, so it is written by hand.
+    static let emptyPacket = Data("""
+    <x:xmpmeta xmlns:x="adobe:ns:meta/">
+       <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+          <rdf:Description rdf:about=""/>
+       </rdf:RDF>
+    </x:xmpmeta>
+
+    """.utf8)
+
+    /// True when the XML is an XMP packet whose descriptions carry no properties (only `rdf:about`).
+    static func isEmptyPacket(_ data: Data) -> Bool {
+        guard let doc = try? XMLDocument(data: data, options: []), let root = doc.rootElement() else { return false }
+        func empty(_ e: XMLElement) -> Bool {
+            switch e.localName {
+            case "xmpmeta", "RDF":
+                return (e.children ?? []).allSatisfy { node in
+                    guard let child = node as? XMLElement else { return node.kind == .text && (node.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                    return empty(child)
+                }
+            case "Description":
+                let attrs = (e.attributes ?? []).filter { $0.localName != "about" }
+                let elements = (e.children ?? []).compactMap { $0 as? XMLElement }
+                return attrs.isEmpty && elements.isEmpty
+            default:
+                return false
+            }
+        }
+        return empty(root)
     }
 
     // MARK: Writing
