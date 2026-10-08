@@ -74,6 +74,7 @@
 		61AC82EF33DEB9AB4C3B51AB /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
 		6FEE4D20BC4D260700BECBB4 /* LoupeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoupeView.swift; sourceTree = "<group>"; };
 		74CCC470E0969E590855D47B /* FolderSession+Similarity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FolderSession+Similarity.swift"; sourceTree = "<group>"; };
+		758A46818EC2DC6C6AF0D4D2 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		7D2831736F5B661614939ECD /* GridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GridView.swift; sourceTree = "<group>"; };
 		7F38619D88E7762C952D8378 /* CompareState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareState.swift; sourceTree = "<group>"; };
 		83D900E6058C503A07C44DDF /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
@@ -154,6 +155,7 @@
 		26DF93EAD017D23DA1BADD48 = {
 			isa = PBXGroup;
 			children = (
+				8ECFD1C1A14C4073D535907E /* Config */,
 				9A85247D59A1CF4ED0B5A47F /* Packages */,
 				68B7E2610C528B469C060ECD /* PhotoCuller */,
 				9374977954C631D81F6B0A55 /* Products */,
@@ -217,6 +219,14 @@
 				61AC82EF33DEB9AB4C3B51AB /* ZoomableImageView.swift */,
 			);
 			path = Common;
+			sourceTree = "<group>";
+		};
+		8ECFD1C1A14C4073D535907E /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				758A46818EC2DC6C6AF0D4D2 /* Signing.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		9088F09A9DF212963D9C99B3 /* Model */ = {
@@ -354,6 +364,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					8242A71209B0573840789F55 = {
+						DevelopmentTeam = "";
 						ProvisioningStyle = Manual;
 					};
 				};
@@ -447,11 +458,10 @@
 /* Begin XCBuildConfiguration section */
 		24EFDB2B8A25FAD1EBE3A625 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 758A46818EC2DC6C6AF0D4D2 /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = PhotoCuller/Resources/PhotoCuller.entitlements;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
@@ -596,11 +606,10 @@
 		};
 		D6D3D8C245950FAA466BC812 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 758A46818EC2DC6C6AF0D4D2 /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = PhotoCuller/Resources/PhotoCuller.entitlements;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;

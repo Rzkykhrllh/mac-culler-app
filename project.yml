@@ -20,6 +20,9 @@ targets:
       - path: PhotoCuller
     dependencies:
       - package: CullerKit
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
     settings:
       base:
         PRODUCT_NAME: PhotoCuller
@@ -31,8 +34,6 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         CODE_SIGN_ENTITLEMENTS: PhotoCuller/Resources/PhotoCuller.entitlements
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGN_STYLE: Manual
         ENABLE_APP_SANDBOX: YES
         ENABLE_USER_SELECTED_FILES: readwrite
         ENABLE_HARDENED_RUNTIME: YES
