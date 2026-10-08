@@ -16,8 +16,10 @@ struct PhotoCullerApp: App {
                     // Development aid: `-openFolder <path>` opens a folder the sandbox can already reach (e.g. inside the container).
                     let args = ProcessInfo.processInfo.arguments
                     Log.session.info("Launch arguments: \(args, privacy: .public)")
+                    if args.contains("-hangWatch") { HangWatch.start() }
                     if let i = args.firstIndex(of: "-openFolder"), args.indices.contains(i + 1) {
-                        app.open(folder: URL(fileURLWithPath: args[i + 1]), securityScoped: false)
+                        app.open(folder: URL(fileURLWithPath: args[i + 1]), securityScoped: false,
+                                 includeSubfolders: args.contains("-subfolders") ? true : nil)
                         if args.contains("-expandTest") {
                             Task {
                                 while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
@@ -58,8 +60,10 @@ struct PhotoCullerApp: App {
                     #endif
                 }
         }
-        // Enforce the content's minimum size so the window can never be smaller than its layout.
-        .windowResizability(.contentMinSize)
+        // The minimum window size is set on the NSWindow itself (ContentView's WindowAccessor). `.contentMinSize`
+        // made SwiftUI re-measure the whole window (every ViewThatFits variant) on each tiny update — with a big
+        // folder's progress updates that alone kept the main thread busy.
+        .windowResizability(.automatic)
         .defaultSize(width: 1400, height: 900)
         .commands { AppCommands(app: app) }
 

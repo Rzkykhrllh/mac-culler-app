@@ -16,8 +16,12 @@ final class PhotoItem: Identifiable {
     /// The primary file's path. Changes when the item is renamed or moved (the session re-keys it).
     private(set) var id: ItemID
     var files: ItemFiles {
-        didSet { id = files.primary.path }
+        didSet { id = files.primary.path; partnerKey = Self.partnerKey(files) }
     }
+    /// Folder + base name without extension: a RAW and a JPEG of the same shot share it.
+    @ObservationIgnored private(set) var partnerKey: String
+
+    private static func partnerKey(_ f: ItemFiles) -> String { (f.primary.path as NSString).deletingPathExtension }
     var metadata: PhotoMetadata
     var exif: ExifInfo?
     /// True once the metadata has been read from disk (or the index).
@@ -32,6 +36,7 @@ final class PhotoItem: Identifiable {
 
     init(files: ItemFiles, metadata: PhotoMetadata = .empty, exif: ExifInfo? = nil, metadataLoaded: Bool = false) {
         id = files.primary.path
+        partnerKey = Self.partnerKey(files)
         self.files = files
         self.metadata = metadata
         self.exif = exif

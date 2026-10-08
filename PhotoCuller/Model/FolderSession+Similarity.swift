@@ -59,7 +59,7 @@ extension FolderSession {
                 }
                 Task.detached(priority: .background) { index.storeFeaturePrints(stored) }
                 done += chunk.count
-                self.similarityProgress = (done, missing.count)
+                if self.shouldPublishProgress("similarity") { self.similarityProgress = (done, missing.count) }
                 if Date().timeIntervalSince(lastRegroup) > 1.5 {
                     lastRegroup = Date()
                     self.regroup()

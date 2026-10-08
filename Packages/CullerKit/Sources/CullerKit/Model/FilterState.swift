@@ -88,9 +88,50 @@ public struct SortOrder: Equatable, Sendable, Codable {
         self.ascending = ascending
     }
 
+    /// Everything one photo contributes to the order, computed once per sort (comparisons then stay cheap:
+    /// sorting tens of thousands of photos does ~500k comparisons).
+    public struct Key: @unchecked Sendable {
+        public var value: Double
+        public var name: NSString
+        public var path: String
+    }
+
+    public func key(files: ItemFiles, exif: ExifInfo?, metadata: PhotoMetadata) -> Key {
+        let value: Double
+        switch key {
+        case .captureTime: value = (exif?.captureDate ?? files.primary.modificationDate).timeIntervalSinceReferenceDate
+        case .fileName: value = 0
+        case .rating: value = Double(metadata.rating)
+        case .modificationDate: value = files.primary.modificationDate.timeIntervalSinceReferenceDate
+        case .fileSize: value = Double(files.files.reduce(0) { $0 + $1.size })
+        }
+        let path = files.primary.path
+        return Key(value: value, name: (path as NSString).lastPathComponent as NSString, path: path)
+    }
+
+    /// Strict ordering on precomputed keys; ties fall back to file name (then path) so the order is stable.
+    public func isIncreasing(_ a: Key, _ b: Key) -> Bool {
+        if key != .fileName, a.value != b.value { return ascending ? a.value < b.value : a.value > b.value }
+        let n = a.name.localizedStandardCompare(b.name as String)
+        let tie = n == .orderedSame ? a.path < b.path : n == .orderedAscending
+        return ascending ? tie : !tie
+    }
+
+    /// Sorts `elements` by this order, computing each element's key once.
+    public func sorted<T>(_ elements: [T], by fields: (T) -> (files: ItemFiles, exif: ExifInfo?, metadata: PhotoMetadata)) -> [T] {
+        let keys = elements.map { e -> Key in let f = fields(e); return key(files: f.files, exif: f.exif, metadata: f.metadata) }
+        return keys.indices.sorted { isIncreasing(keys[$0], keys[$1]) }.map { elements[$0] }
+    }
+
     /// Strict ordering; ties fall back to file name so the order is stable.
     public func areInIncreasingOrder(_ a: (files: ItemFiles, exif: ExifInfo?, metadata: PhotoMetadata),
                                      _ b: (files: ItemFiles, exif: ExifInfo?, metadata: PhotoMetadata)) -> Bool {
+        isIncreasing(key(files: a.files, exif: a.exif, metadata: a.metadata), key(files: b.files, exif: b.exif, metadata: b.metadata))
+    }
+
+    /// The original comparator, kept as the reference for tests.
+    func referenceOrder(_ a: (files: ItemFiles, exif: ExifInfo?, metadata: PhotoMetadata),
+                        _ b: (files: ItemFiles, exif: ExifInfo?, metadata: PhotoMetadata)) -> Bool {
         func name(_ x: ItemFiles) -> String { x.primary.fileName }
         let nameOrder = name(a.files).localizedStandardCompare(name(b.files))
         let tie: Bool = nameOrder == .orderedSame ? a.files.primary.path < b.files.primary.path : nameOrder == .orderedAscending

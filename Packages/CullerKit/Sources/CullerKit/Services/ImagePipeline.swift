@@ -38,6 +38,8 @@ public final class ImagePipeline: @unchecked Sendable {
     /// starving JPEG / embedded-preview thumbnails.
     private let rawLoads: LoadQueue
     private let previewLoads: LoadQueue
+    /// Background focus analysis: its own low-priority queue so it never delays what the user is looking at.
+    private let analysisLoads = LoadQueue(name: "analysis", maxConcurrent: 2, qos: .utility)
     private let fullLoads: LoadQueue
     public let diskCache: ThumbnailDiskCache?
 
@@ -199,7 +201,7 @@ public final class ImagePipeline: @unchecked Sendable {
     /// Pairs and RAWs use the camera's embedded preview (fast; sharpness is the same as in the JPEG).
     public func analysisImage(for item: ItemFiles, maxPixel: Int = 1600) async -> CGImage? {
         let file: FileRef = item.isPair ? (Self.rawEngineReady ? (item.raw ?? item.primary) : item.primary) : item.primary
-        return await previewLoads.load(key: "analysis#\(file.cacheKey)", priority: .veryLow) {
+        return await analysisLoads.load(key: "analysis#\(file.cacheKey)", priority: .veryLow) {
             ImageDecoder.preview(for: file, maxPixel: maxPixel, raw: .embedded)
         }
     }
@@ -380,10 +382,10 @@ final class LoadQueue: @unchecked Sendable {
 
     var keys: Set<String> { lock.withLock { Set(inflight.keys) } }
 
-    init(name: String, maxConcurrent: Int) {
+    init(name: String, maxConcurrent: Int, qos: QualityOfService = .userInitiated) {
         queue.name = "PhotoCuller.\(name)"
         queue.maxConcurrentOperationCount = maxConcurrent
-        queue.qualityOfService = .userInitiated
+        queue.qualityOfService = qos
     }
 
     func load(key: String, priority: Operation.QueuePriority, work: @escaping @Sendable () -> CGImage?) async -> CGImage? {

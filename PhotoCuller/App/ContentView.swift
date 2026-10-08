@@ -51,6 +51,7 @@ struct ContentView: View {
         .background(WindowAccessor { window in
             KeyboardController.shared.mainWindow = window
             window.tabbingMode = .disallowed
+            window.contentMinSize = NSSize(width: 900, height: 560)
         })
         .sheet(isPresented: $app.showGuide, onDismiss: { app.guideClosed() }) { GettingStartedView() }
         .alert(item: $app.alert) { a in
@@ -223,8 +224,8 @@ struct StatusBar: View {
     let session: FolderSession
 
     var body: some View {
-        let picks = session.items.values.filter { $0.metadata.flag == .pick }.count
-        let rejects = session.items.values.filter { $0.metadata.flag == .reject }.count
+        let picks = session.pickCount
+        let rejects = session.rejectCount
         // Secondary chips drop out first when the window is narrow.
         ViewThatFits(in: .horizontal) {
             row(picks: picks, rejects: rejects, compact: false)

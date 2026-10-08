@@ -267,7 +267,12 @@ final class AppModel {
             if subfolders {
                 let limit = settings.subfolderWarningThreshold
                 let count = await Task.detached { FolderScanner.countImages(folder: url, includeSubfolders: true, stopAfter: limit) }.value
-                if count > limit, !confirmLargeScan(url: url, limit: limit) { return }
+                #if DEBUG
+                let skipConfirm = ProcessInfo.processInfo.arguments.contains("-subfolders")
+                #else
+                let skipConfirm = false
+                #endif
+                if count > limit, !skipConfirm, !confirmLargeScan(url: url, limit: limit) { return }
             }
             if let old = tab.session {
                 tab.session = nil

@@ -58,7 +58,15 @@ extension FolderSession {
 
     /// Recomputes the filtered, sorted display list (spec §7: stacks stay intact, shown if ≥1 member matches).
     func rebuildDisplay() {
+        let perfStart = Date()
+        defer {
+            let ms = Int(Date().timeIntervalSince(perfStart) * 1000)
+            if ms > 30 { Log.session.info("PERF rebuildDisplay \(ms) ms (\(self.items.count) items)") }
+        }
+        let tp = Date()
         rebuildPartnerIndex()
+        let partnerMs = Int(Date().timeIntervalSince(tp) * 1000)
+        if partnerMs > 20 { Log.session.info("PERF partner index \(partnerMs) ms") }
         let f = filter
         let filterActive = f.isActive
         let mode = fileView
@@ -93,11 +101,7 @@ extension FolderSession {
             }
         }
 
-        let order = sort
-        units.sort { a, b in
-            order.areInIncreasingOrder((a.representative.files, a.representative.exif, a.representative.metadata),
-                                       (b.representative.files, b.representative.exif, b.representative.metadata))
-        }
+        units = sort.sorted(units) { ($0.representative.files, $0.representative.exif, $0.representative.metadata) }
 
         var out: [DisplayEntry] = []
         out.reserveCapacity(matchCount)
@@ -122,6 +126,7 @@ extension FolderSession {
         for (i, e) in out.enumerated() { idx[e.itemID] = i }
         displayIndex = idx
         matchingCount = matchCount
+        recountFlags()
         displayRevision += 1
         itemsRevision += 1
 
@@ -146,17 +151,19 @@ extension FolderSession {
     /// Separate RAW/JPEG modes: the other file of the same shot (same folder + base name), if shown as its own photo.
     func partner(of id: ItemID) -> ItemID? {
         guard !fileView.pairs, let item = items[id] else { return nil }
-        let base = item.files.folder.appendingPathComponent(item.files.baseName).path
         let wantRaw = !item.files.primary.kind.isRaw
-        return partnerIndex[base]?.first { $0 != id && items[$0]?.files.primary.kind.isRaw == wantRaw }
+        return partnerIndex[item.partnerKey]?.first { $0 != id && items[$0]?.files.primary.kind.isRaw == wantRaw }
     }
 
     /// Rebuilds the base-name → items index used by `partner(of:)`.
     func rebuildPartnerIndex() {
+        guard !partnerIndexValid || partnerIndexMode != fileView else { return }
+        partnerIndexValid = true
+        partnerIndexMode = fileView
         var idx: [String: [ItemID]] = [:]
         if !fileView.pairs {
             for item in items.values {
-                idx[item.files.folder.appendingPathComponent(item.files.baseName).path, default: []].append(item.id)
+                idx[item.partnerKey, default: []].append(item.id)
             }
         }
         partnerIndex = idx
