@@ -120,9 +120,8 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
     var onQuickMark: ((MarkCommand) -> Void)?
     /// Separate RAW/JPEG mode: file name of the other half of this shot (nil when not separated).
     var partnerName: String? { didSet { if oldValue != partnerName { needsDisplay = true } } }
-    /// The partner of the hovered photo: drawn with a dashed outline.
+    /// The other file of the current photo (separate mode): drawn with a dashed outline.
     var isPartnerHighlighted = false { didSet { if oldValue != isPartnerHighlighted { needsDisplay = true } } }
-    var onHoverChange: ((Bool) -> Void)?
     /// Badge rects → explanation, for tooltips.
     private var tips: [(NSRect, String)] = []
     /// Filmstrips handle clicks themselves (click = pick on mouse-up) so a drag never changes the active slot.
@@ -172,7 +171,6 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         if inside != isHovered {
             isHovered = inside
             hoverPoint = inside ? p : nil
-            onHoverChange?(inside)
         }
     }
 
@@ -195,16 +193,14 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
     override func mouseEntered(with event: NSEvent) {
         isHovered = true
         hoverPoint = convert(event.locationInWindow, from: nil)
-        onHoverChange?(true)
     }
     override func mouseMoved(with event: NSEvent) {
-        if !isHovered { isHovered = true; onHoverChange?(true) }
+        if !isHovered { isHovered = true }
         hoverPoint = convert(event.locationInWindow, from: nil)
     }
     override func mouseExited(with event: NSEvent) {
         isHovered = false
         hoverPoint = nil
-        onHoverChange?(false)
     }
 
     private func hoverControl(at p: NSPoint?) -> Control? {
@@ -418,13 +414,25 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         let pad: CGFloat = compact ? 3 : 5
         let showHoverBar = isHovered && !compact && image != nil && r.width > 110
 
-        // Partner of the hovered photo (separate RAW/JPEG mode): dashed outline.
-        if isPartnerHighlighted {
-            let dashed = NSBezierPath(roundedRect: b.insetBy(dx: 1, dy: 1), xRadius: radius, yRadius: radius)
+        // The other file of the current photo (separate RAW/JPEG mode): white dashed outline + PAIR tag.
+        // Deliberately not orange: orange always means "pointer / selected".
+        if isPartnerHighlighted && !isCurrent {
+            let dashed = NSBezierPath(roundedRect: b.insetBy(dx: 1.5, dy: 1.5), xRadius: radius, yRadius: radius)
             dashed.lineWidth = 2
-            dashed.setLineDash([6, 4], count: 2, phase: 0)
-            Theme.nsAccentStart.setStroke()
+            dashed.setLineDash([7, 5], count: 2, phase: 0)
+            NSColor(white: 1, alpha: 0.8).setStroke()
             dashed.stroke()
+            if r.width > 70 {
+                let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: compact ? 8 : 9, weight: .bold),
+                                                            .foregroundColor: NSColor.black, .kern: 0.6]
+                let t = NSAttributedString(string: "PAIR", attributes: attrs)
+                let ts = t.size()
+                let tag = NSRect(x: b.midX - ts.width / 2 - 6, y: b.minY - 1, width: ts.width + 12, height: ts.height + 4)
+                NSColor(white: 1, alpha: 0.9).setFill()
+                NSBezierPath(roundedRect: tag, xRadius: tag.height / 2, yRadius: tag.height / 2).fill()
+                t.draw(at: NSPoint(x: tag.minX + 6, y: tag.minY + 2))
+                tips.append((tag, "The other file of the selected photo (same shot)"))
+            }
         }
 
         // Top-left: flag, sharpest.

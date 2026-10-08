@@ -80,18 +80,9 @@ struct ThumbnailCollection: NSViewRepresentable {
         private var lastWidth: CGFloat = 0
         private var syncing = false
         private var prefetchTasks: [IndexPath: Task<Void, Never>] = [:]
-        /// Separate RAW/JPEG mode: the partner of the hovered photo, outlined.
-        private var hoveredPartner: ItemID?
-
-        func hoverChanged(_ id: ItemID, _ inside: Bool) {
-            let partner = inside ? parent.session.partner(of: id) : nil
-            guard partner != hoveredPartner, inside || hoveredPartner == parent.session.partner(of: id) else { return }
-            hoveredPartner = partner
-            guard let cv = collectionView else { return }
-            for case let cell as ThumbnailCell in cv.visibleItems() {
-                cell.cellView.isPartnerHighlighted = cell.representedID != nil && cell.representedID == partner
-            }
-        }
+        /// Separate RAW/JPEG mode: the other file of the *current* photo gets a dashed outline.
+        /// (It follows the pointer, not the mouse, so there is only ever one pair marked.)
+        private var currentPartner: ItemID? { parent.currentID.flatMap { parent.session.partner(of: $0) } }
 
         init(_ p: ThumbnailCollection) { parent = p }
 
@@ -105,10 +96,14 @@ struct ThumbnailCollection: NSViewRepresentable {
             parent = p
             guard let cv = collectionView else { return }
             cv.contextMenuProvider = p.contextMenu
+            var reloaded = false
+            // Strip: remember where the pointer sits on screen so the reload doesn't make the strip jump.
+            let anchorX = p.style.isStrip ? screenX(of: lastCurrent, in: cv) : nil
             if force || p.revision != revision {
                 revision = p.revision
                 entries = p.entries
                 cv.reloadData()
+                reloaded = true
             }
             if p.style != style {
                 style = p.style
@@ -117,10 +112,27 @@ struct ThumbnailCollection: NSViewRepresentable {
             cv.allowsMultipleSelection = p.allowsMultipleSelection
             syncSelection(cv)
             refreshVisibleState(cv)
-            if p.currentID != lastCurrent || force {
+            if reloaded, !force, p.style.isStrip, let anchorX, let id = p.currentID, let ip = indexPath(of: id) {
+                // E.g. a stack expanded in the loupe: its first photo takes the cover's place, the rest follow on the right.
+                lastCurrent = id
+                cv.layoutSubtreeIfNeeded()
+                if let frame = cv.layoutAttributesForItem(at: ip)?.frame, let clip = cv.enclosingScrollView?.contentView {
+                    let maxX = max(0, cv.frame.width - clip.bounds.width)
+                    clip.scroll(to: NSPoint(x: min(max(0, frame.minX - anchorX), maxX), y: clip.bounds.minY))
+                    cv.enclosingScrollView?.reflectScrolledClipView(clip)
+                }
+            } else if p.currentID != lastCurrent || force {
                 lastCurrent = p.currentID
                 scrollToCurrent(cv)
             }
+        }
+
+        /// The item's x position relative to the visible area, if it is on screen.
+        private func screenX(of id: ItemID?, in cv: NSCollectionView) -> CGFloat? {
+            guard let id, let i = entries.firstIndex(where: { $0.itemID == id }),
+                  let frame = cv.layoutAttributesForItem(at: IndexPath(item: i, section: 0))?.frame,
+                  cv.visibleRect.intersects(frame) else { return nil }
+            return frame.minX - cv.visibleRect.minX
         }
 
         /// Sets the layout's item size directly (all cells change together) and fits the columns to the width,
@@ -166,9 +178,11 @@ struct ThumbnailCollection: NSViewRepresentable {
         }
 
         private func refreshVisibleState(_ cv: NSCollectionView) {
+            let partner = currentPartner
             for case let cell as ThumbnailCell in cv.visibleItems() {
                 guard let id = cell.representedID else { continue }
                 cell.cellView.isCurrent = id == parent.currentID
+                cell.cellView.isPartnerHighlighted = id == partner
                 cell.cellView.compareSlot = parent.compareSlots.firstIndex(of: id)
                 if parent.style.isStrip { cell.cellView.isSelectedCell = parent.selection.contains(id) }
             }
@@ -221,8 +235,7 @@ struct ThumbnailCollection: NSViewRepresentable {
             }
             cell.cellView.manualClicks = parent.style.isStrip
             cell.cellView.partnerName = parent.session.partner(of: id).flatMap { parent.session.items[$0]?.fileName }
-            cell.cellView.isPartnerHighlighted = hoveredPartner == id
-            cell.cellView.onHoverChange = { [weak self] inside in self?.hoverChanged(id, inside) }
+            cell.cellView.isPartnerHighlighted = id == currentPartner
             cell.cellView.onQuickMark = parent.onQuickMark.map { f in { cmd in f(id, cmd) } }
             if parent.style.isStrip {
                 cell.cellView.isSelectedCell = parent.selection.contains(id)
