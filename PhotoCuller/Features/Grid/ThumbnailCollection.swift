@@ -40,7 +40,8 @@ struct ThumbnailCollection: NSViewRepresentable {
 
         let cv = KeyPassingCollectionView()
         cv.collectionViewLayout = layout
-        cv.isSelectable = true
+        // Filmstrips do their own click handling (click on mouse-up, drag to a compare slot).
+        cv.isSelectable = !style.isStrip
         cv.allowsMultipleSelection = allowsMultipleSelection
         cv.allowsEmptySelection = true
         cv.backgroundColors = [.clear]
@@ -155,6 +156,7 @@ struct ThumbnailCollection: NSViewRepresentable {
                 guard let id = cell.representedID else { continue }
                 cell.cellView.isCurrent = id == parent.currentID
                 cell.cellView.compareSlot = parent.compareSlots.firstIndex(of: id)
+                if parent.style.isStrip { cell.cellView.isSelectedCell = parent.selection.contains(id) }
             }
         }
 
@@ -170,6 +172,11 @@ struct ThumbnailCollection: NSViewRepresentable {
         /// Right-click on an unselected item selects it first (Finder behaviour).
         func rightClicked(_ ip: IndexPath?) {
             guard let cv = collectionView, let ip, entries.indices.contains(ip.item) else { return }
+            if parent.style.isStrip {
+                let id = entries[ip.item].itemID
+                if !parent.selection.contains(id) { parent.onSelectionChange([id], id) }
+                return
+            }
             if !cv.selectionIndexPaths.contains(ip) {
                 syncing = true
                 cv.selectionIndexPaths = [ip]
@@ -191,6 +198,11 @@ struct ThumbnailCollection: NSViewRepresentable {
             }
             let id = entry.itemID
             cell.cellView.onDoubleClick = { [weak self] in self?.parent.onActivate(id) }
+            cell.cellView.manualClicks = parent.style.isStrip
+            if parent.style.isStrip {
+                cell.cellView.isSelectedCell = parent.selection.contains(id)
+                cell.cellView.onClick = { [weak self] in self?.parent.onSelectionChange([id], id) }
+            }
             cell.cellView.onStackBadge = { [weak self] in
                 if let sid = entry.stackID { self?.parent.onToggleStack(sid) }
             }

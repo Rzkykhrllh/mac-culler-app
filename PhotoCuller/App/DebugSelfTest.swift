@@ -1,5 +1,5 @@
 #if DEBUG
-import Foundation
+import AppKit
 import CullerKit
 
 /// DEBUG-only smoke test driven through the real session (launch with `-openFolder <dir> -selfTest`).
@@ -57,6 +57,25 @@ enum DebugSelfTest {
             check(s.compare.activeItemID != before, "←/→ changes active slot item")
             s.cycleActiveSlot()
             check(s.compare.active == 0 || s.compare.active == 1, "tab cycles slots")
+
+            // Drag & drop: payload survives a real pasteboard, and a drop fills the right slot.
+            let pb = NSPasteboard(name: NSPasteboard.Name("PhotoCuller.selftest"))
+            pb.clearContents()
+            let dragged = s.display.last!.itemID
+            pb.writeObjects([DragPayload.pasteboardItem(for: s.items[dragged]!)])
+            let dropped = DragPayload.itemID(from: pb)
+            check(dropped == dragged, "drag payload round-trips")
+            if let dropped { s.put(dropped, inSlot: 1) }
+            check(s.compare.slots[1] == dragged && s.compare.active == 1, "drop puts photo in right slot")
+            pb.releaseGlobally()
+
+            let base = s.compare.candidates.count
+            s.setCompareStripShowsAll(true)
+            check(s.compare.candidates.count == s.allDisplayItemIDs.count && s.compare.candidates.count > base,
+                  "filmstrip all photos (\(s.compare.candidates.count)) vs candidates (\(base))")
+            s.setCompareStripShowsAll(false)
+            check(s.compare.candidates.count == base, "filmstrip back to candidates")
+            check(s.showFilmstrip, "filmstrip visible by default")
             s.viewMode = .grid
         }
 

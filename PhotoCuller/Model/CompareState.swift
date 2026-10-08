@@ -7,6 +7,10 @@ struct CompareState: Equatable {
     var active = 0
     /// Filmstrip contents: the items slots can be filled from.
     var candidates: [ItemID] = []
+    /// The candidates compare was entered with (selection / stack), kept while the strip shows all photos.
+    var baseCandidates: [ItemID] = []
+    /// Filmstrip shows every photo in the current view instead of just the candidates.
+    var stripShowsAll = false
     /// "Pin current best": slot 0 holds the best, ←/→ cycles the other slot, Return promotes.
     var pinBest = false
     var syncZoom = true
@@ -50,8 +54,35 @@ extension FolderSession {
             c.active = currentID == nil ? 0 : 1
         }
         if c.pinBest { c.active = min(1, c.slots.count - 1) }
+        c.baseCandidates = c.candidates
+        if compare.stripShowsAll {
+            c.stripShowsAll = true
+            c.candidates = allDisplayItemIDs
+        }
         compare = c
         viewMode = .compare
+    }
+
+    /// Every photo in the view, with collapsed stacks contributing all their members.
+    var allDisplayItemIDs: [ItemID] {
+        display.flatMap { e -> [ItemID] in
+            if e.isCollapsedStack, let sid = e.stackID { return visibleMembers(ofStack: sid) }
+            return [e.itemID]
+        }
+    }
+
+    /// ⌥A: filmstrip shows all photos ↔ only the compare candidates.
+    func setCompareStripShowsAll(_ all: Bool) {
+        compare.stripShowsAll = all
+        compare.candidates = all ? allDisplayItemIDs : (compare.baseCandidates.isEmpty ? allDisplayItemIDs : compare.baseCandidates)
+    }
+
+    /// Drag & drop from the filmstrip onto a slot.
+    func put(_ id: ItemID, inSlot slot: Int) {
+        guard compare.slots.indices.contains(slot), items[id] != nil else { return }
+        compare.slots[slot] = id
+        compare.active = slot
+        currentID = id
     }
 
     /// Clicking a filmstrip item puts it into the active slot.

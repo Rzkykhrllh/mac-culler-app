@@ -177,6 +177,9 @@ struct AppCommands: Commands {
                     .keyboardShortcut("z", modifiers: .option)
                 Toggle("Pin Current Best", isOn: Binding(get: { session?.compare.pinBest ?? false }, set: { session?.compare.pinBest = $0 }))
                     .keyboardShortcut("p", modifiers: .option)
+                Toggle("Filmstrip Shows All Photos", isOn: Binding(get: { session?.compare.stripShowsAll ?? false },
+                                                                   set: { session?.setCompareStripShowsAll($0) }))
+                    .keyboardShortcut("a", modifiers: .option)
             }
             .disabled(session == nil)
             Divider()
@@ -185,6 +188,8 @@ struct AppCommands: Commands {
                     .keyboardShortcut("i", modifiers: [])
                 Toggle("Histogram", isOn: Binding(get: { session?.showHistogram ?? false }, set: { session?.showHistogram = $0 }))
                     .keyboardShortcut("h", modifiers: [])
+                Toggle("Filmstrip", isOn: Binding(get: { session?.showFilmstrip ?? true }, set: { session?.showFilmstrip = $0 }))
+                    .keyboardShortcut("b", modifiers: [.command, .option])
             }
             .disabled(!canAct)
             Button("Find / Filter") { NotificationCenter.default.post(name: .focusFilterBar, object: nil) }
