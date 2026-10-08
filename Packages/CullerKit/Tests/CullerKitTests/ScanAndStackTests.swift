@@ -49,6 +49,19 @@ final class ScanAndStackTests: XCTestCase {
         XCTAssertEqual(FolderScanner.countImages(folder: dir, includeSubfolders: true), 2)
     }
 
+    func testSubfolderScanningGoesAllLevelsDeep() throws {
+        let dir = try TestSupport.tempDir()
+        let deep = dir.appendingPathComponent("A/B/C", isDirectory: true)
+        try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
+        TestSupport.makeImage(dir.appendingPathComponent("top.jpg"))
+        TestSupport.makeImage(dir.appendingPathComponent("A/one.jpg"))
+        TestSupport.makeImage(dir.appendingPathComponent("A/B/two.jpg"))
+        TestSupport.makeImage(deep.appendingPathComponent("three.jpg"))
+        XCTAssertEqual(try FolderScanner.scan(folder: dir, options: ScanOptions(includeSubfolders: false)).count, 1)
+        let all = try FolderScanner.scan(folder: dir, options: ScanOptions(includeSubfolders: true))
+        XCTAssertEqual(Set(all.map(\.primary.url.lastPathComponent)), ["top.jpg", "one.jpg", "two.jpg", "three.jpg"])
+    }
+
     func testExifCaptureDateWithSubsecAndOffset() throws {
         let r = try XCTUnwrap(ExifReader.parseCaptureDate("2024:05:01 10:00:00", subsec: "250", offset: "+07:00"))
         XCTAssertEqual(r.offset, 7 * 3600)

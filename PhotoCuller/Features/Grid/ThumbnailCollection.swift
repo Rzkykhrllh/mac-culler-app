@@ -84,7 +84,15 @@ struct ThumbnailCollection: NSViewRepresentable {
         /// (It follows the pointer, not the mouse, so there is only ever one pair marked.)
         private var currentPartner: ItemID? { parent.currentID.flatMap { parent.session.partner(of: $0) } }
 
-        init(_ p: ThumbnailCollection) { parent = p }
+        init(_ p: ThumbnailCollection) {
+            parent = p
+            super.init()
+            NotificationCenter.default.addObserver(forName: .themeChanged, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    for case let cell as ThumbnailCell in self?.collectionView?.visibleItems() ?? [] { cell.view.needsDisplay = true }
+                }
+            }
+        }
 
         func observeResize(_ sv: NSScrollView) {
             NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: sv.contentView, queue: .main) { [weak self] _ in
