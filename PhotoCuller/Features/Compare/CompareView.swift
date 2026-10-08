@@ -181,15 +181,12 @@ struct CompareToolbar: View {
     }
 
     private var slotPicker: some View {
-        Picker("Slots", selection: Binding(get: { session.compare.slots.count },
-                                           set: { session.compare.setSlotCount($0) })) {
-            Text("2").tag(2)
-            Text("3").tag(3)
-            Text("4").tag(4)
+        HStack(spacing: 6) {
+            Text("Slots").font(.caption).foregroundStyle(.secondary)
+            ChoiceBar(options: [2, 3, 4].map { n in
+                .init(value: n, title: "\(n)", help: n == 2 ? "Two photos side by side (⌥2)" : "\(n) photos in a grid (⌥\(n))")
+            }, selection: Binding(get: { session.compare.slots.count }, set: { session.compare.setSlotCount($0) }))
         }
-        .pickerStyle(.segmented)
-        .fixedSize()
-        .help("Number of slots (⌥2 / ⌥3 / ⌥4)")
     }
 
     private func toggles(compact: Bool) -> some View {
@@ -203,14 +200,11 @@ struct CompareToolbar: View {
     }
 
     private func stripPicker(compact: Bool) -> some View {
-        Picker("", selection: Binding(get: { session.compare.stripShowsAll }, set: { session.setCompareStripShowsAll($0) })) {
-            Text(compact ? "Candidates" : (session.compare.baseCandidates.count > 1 ? "Candidates (\(session.compare.baseCandidates.count))" : "Candidates")).tag(false)
-            Text(compact ? "All" : "All Photos").tag(true)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .fixedSize()
-        .help("What the filmstrip shows (⌥A)")
+        ChoiceBar(options: [
+            .init(value: false, title: compact ? "Candidates" : (session.compare.baseCandidates.count > 1 ? "Candidates (\(session.compare.baseCandidates.count))" : "Candidates"),
+                  help: "Filmstrip shows only the photos you entered Compare with (the selection or the stack). ⌥A"),
+            .init(value: true, title: compact ? "All" : "All Photos", help: "Filmstrip shows every photo in the folder view. ⌥A"),
+        ], selection: Binding(get: { session.compare.stripShowsAll }, set: { session.setCompareStripShowsAll($0) }))
     }
 
     private var hint: some View {

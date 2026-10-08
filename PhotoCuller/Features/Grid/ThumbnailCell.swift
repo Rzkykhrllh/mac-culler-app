@@ -30,6 +30,9 @@ final class ThumbnailCell: NSCollectionViewItem {
         cellView.image = nil
         cellView.isCurrent = false
         cellView.compareSlot = nil
+        cellView.resetHover()
+        cellView.partnerName = nil
+        cellView.isPartnerHighlighted = false
     }
 
     func configure(entry: DisplayEntry, item: PhotoItem, pipeline: ImagePipeline, compact: Bool,
@@ -99,7 +102,7 @@ enum DragPayload {
     }
 }
 
-final class ThumbnailCellView: NSView, NSDraggingSource {
+final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
         .copy
     }
@@ -115,6 +118,13 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
     var onStackBadge: (() -> Void)?
     /// Hover bar actions (pick / reject / rating) — applied to this photo only.
     var onQuickMark: ((MarkCommand) -> Void)?
+    /// Separate RAW/JPEG mode: file name of the other half of this shot (nil when not separated).
+    var partnerName: String? { didSet { if oldValue != partnerName { needsDisplay = true } } }
+    /// The partner of the hovered photo: drawn with a dashed outline.
+    var isPartnerHighlighted = false { didSet { if oldValue != isPartnerHighlighted { needsDisplay = true } } }
+    var onHoverChange: ((Bool) -> Void)?
+    /// Badge rects → explanation, for tooltips.
+    private var tips: [(NSRect, String)] = []
     /// Filmstrips handle clicks themselves (click = pick on mouse-up) so a drag never changes the active slot.
     var manualClicks = false
     var onClick: (() -> Void)?
@@ -132,11 +142,39 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
         super.init(frame: frame)
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
+        addToolTip(bounds, owner: self, userData: nil)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+
+    // MARK: Tooltips
+
+    func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
+        if let tip = tips.first(where: { $0.0.contains(point) })?.1 { return tip }
+        guard let item else { return "" }
+        var lines = [item.fileName]
+        if let e = item.exif, e.captureDate != nil { lines.append(ExifFormat.summary(e)) }
+        return lines.joined(separator: "\n")
+    }
+
+    /// Forget hover when the cell is reused or scrolled away (mouseExited is not always delivered then).
+    func resetHover() {
+        isHovered = false
+        hoverPoint = nil
+    }
+
+    private func syncHoverWithPointer() {
+        guard let window else { resetHover(); return }
+        let p = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        let inside = visibleRect.contains(p)
+        if inside != isHovered {
+            isHovered = inside
+            hoverPoint = inside ? p : nil
+            onHoverChange?(inside)
+        }
+    }
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
@@ -148,11 +186,26 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
         trackingAreas.forEach(removeTrackingArea)
         addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeInKeyWindow, .inVisibleRect],
                                        owner: self, userInfo: nil))
+        removeAllToolTips()
+        addToolTip(bounds, owner: self, userData: nil)
+        // Scrolling moves cells under a still pointer without enter/exit events.
+        syncHoverWithPointer()
     }
 
-    override func mouseEntered(with event: NSEvent) { isHovered = true; hoverPoint = convert(event.locationInWindow, from: nil) }
-    override func mouseMoved(with event: NSEvent) { hoverPoint = convert(event.locationInWindow, from: nil) }
-    override func mouseExited(with event: NSEvent) { isHovered = false; hoverPoint = nil }
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        hoverPoint = convert(event.locationInWindow, from: nil)
+        onHoverChange?(true)
+    }
+    override func mouseMoved(with event: NSEvent) {
+        if !isHovered { isHovered = true; onHoverChange?(true) }
+        hoverPoint = convert(event.locationInWindow, from: nil)
+    }
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        hoverPoint = nil
+        onHoverChange?(false)
+    }
 
     private func hoverControl(at p: NSPoint?) -> Control? {
         guard let p else { return nil }
@@ -248,6 +301,7 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
         let radius: CGFloat = compact ? 7 : 10
         let card = NSBezierPath(roundedRect: b, xRadius: radius, yRadius: radius)
         controlRects = []
+        tips = []
 
         // Collapsed stack: a second card peeking out behind.
         if entry?.isCollapsedStack == true {
@@ -319,6 +373,7 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
             c.withAlphaComponent(0.85).setStroke()
             card.lineWidth = 2
             card.stroke()
+            tips.append((b, "\(meta.label.displayName) label"))
         } else {
             NSColor(white: 1, alpha: 0.06).setStroke()
             card.lineWidth = 1
@@ -328,19 +383,41 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
         let pad: CGFloat = compact ? 3 : 5
         let showHoverBar = isHovered && !compact && image != nil && r.width > 110
 
+        // Partner of the hovered photo (separate RAW/JPEG mode): dashed outline.
+        if isPartnerHighlighted {
+            let dashed = NSBezierPath(roundedRect: b.insetBy(dx: 1, dy: 1), xRadius: radius, yRadius: radius)
+            dashed.lineWidth = 2
+            dashed.setLineDash([6, 4], count: 2, phase: 0)
+            Theme.nsAccentStart.setStroke()
+            dashed.stroke()
+        }
+
         // Top-left: flag, sharpest.
         var x = r.minX + pad
         switch meta.flag {
-        case .pick: x = pill(symbol: "flag.fill", color: .white, at: NSPoint(x: x, y: r.minY + pad)).maxX + 3
-        case .reject: x = pill(symbol: "xmark", color: NSColor(calibratedRed: 1, green: 0.35, blue: 0.35, alpha: 1), at: NSPoint(x: x, y: r.minY + pad)).maxX + 3
+        case .pick:
+            let pr = pill(symbol: "flag.fill", color: .white, at: NSPoint(x: x, y: r.minY + pad))
+            tips.append((pr, "Pick (P) — a keeper"))
+            x = pr.maxX + 3
+        case .reject:
+            let rr = pill(symbol: "xmark", color: NSColor(calibratedRed: 1, green: 0.35, blue: 0.35, alpha: 1), at: NSPoint(x: x, y: r.minY + pad))
+            tips.append((rr, "Reject (X) — marked only; nothing is deleted"))
+            x = rr.maxX + 3
         case .none: break
         }
         if item?.isSharpestInStack == true {
-            pill(symbol: "scope", color: Self.sharpGreen, at: NSPoint(x: x, y: r.minY + pad))
+            let sr = pill(symbol: "scope", color: Self.sharpGreen, at: NSPoint(x: x, y: r.minY + pad))
+            tips.append((sr, "Sharpest frame of this stack (B jumps here). A hint — you decide."))
         }
-        // Top-right: RAW+JPG; compare slot.
+        // Top-right: RAW+JPG pair, or the broken-chain cue of a separated pair; compare slot.
         if let item, item.files.isPair, !compact, r.width > 120 {
-            pill(text: item.files.badge, at: NSPoint(x: r.maxX - pad, y: r.minY + pad), alignRight: true)
+            let pr = pill(text: item.files.badge, at: NSPoint(x: r.maxX - pad, y: r.minY + pad), alignRight: true)
+            tips.append((pr, "\(item.files.badge): a RAW file and a JPEG of the same shot, shown as one photo. Marks apply to both files."))
+        } else if let partner = partnerName, let item {
+            let kind = item.files.primary.kind.isRaw ? "RAW" : "JPG"
+            let pr = pill(text: compact ? nil : kind, symbol: "personalhotspot.slash", color: Theme.nsAccentStart,
+                          at: NSPoint(x: r.maxX - pad, y: r.minY + pad), alignRight: true)
+            tips.append((pr, "Separated pair: the other file of this shot is \(partner). Hover to see it outlined; switch to RAW+JPG to treat them as one photo."))
         }
         if let s = compareSlot {
             pill(text: ["L", "R", "3", "4"][min(s, 3)], at: NSPoint(x: r.midX - 8, y: r.minY + pad), fill: Theme.nsAccentEnd)
@@ -362,6 +439,9 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
                 stackBadgeRect = pill(text: text, symbol: compact ? nil : "square.stack", at: NSPoint(x: r.maxX - pad, y: y), alignRight: true,
                                       fill: collapsed ? Theme.nsAccentEnd.withAlphaComponent(0.92) : NSColor(white: 0.12, alpha: 0.78))
                     .insetBy(dx: -4, dy: -4)
+                tips.append((stackBadgeRect, collapsed
+                    ? "Stack of \(text) photos taken together. Click, double-click or press S to expand."
+                    : "Photo \(text) of an expanded stack. Click or press S to collapse."))
             }
         }
 
@@ -373,7 +453,14 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
             if meta.hasNote { parts.append(("text.bubble.fill", .white)) }
             if case .failed = item?.writeState { parts.append(("exclamationmark.triangle.fill", .systemOrange)) }
             if !parts.isEmpty {
-                drawInfoPill(parts, rating: meta.rating, at: NSPoint(x: r.minX + pad, y: r.maxY - pad - pillHeight))
+                let origin = NSPoint(x: r.minX + pad, y: r.maxY - pad - pillHeight)
+                drawInfoPill(parts, rating: meta.rating, at: origin)
+                var desc: [String] = []
+                if meta.label != .none { desc.append("\(meta.label.displayName) label") }
+                if meta.rating > 0 { desc.append("\(meta.rating) star\(meta.rating == 1 ? "" : "s")") }
+                if meta.hasNote { desc.append("Note: \(meta.note)") }
+                if case .failed(let msg) = item?.writeState { desc.append("Not saved: \(msg)") }
+                tips.append((NSRect(x: origin.x, y: origin.y, width: 120, height: pillHeight), desc.joined(separator: " · ")))
             }
         } else {
             drawHoverBar(in: r, meta: meta)

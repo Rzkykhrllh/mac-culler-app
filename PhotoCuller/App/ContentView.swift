@@ -50,6 +50,7 @@ struct ContentView: View {
             KeyboardController.shared.mainWindow = window
             window.tabbingMode = .disallowed
         })
+        .sheet(isPresented: $app.showGuide, onDismiss: { app.guideClosed() }) { GettingStartedView() }
         .alert(item: $app.alert) { a in
             Alert(title: Text(a.title), message: Text(a.message))
         }
@@ -171,13 +172,10 @@ struct SessionToolbar: ToolbarContent {
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .principal) {
-            Picker("View", selection: Binding(get: { session.viewMode }, set: { m in
-                if m == .compare { session.enterCompare() } else { session.viewMode = m }
-            })) {
-                ForEach(ViewMode.allCases) { m in Label(m.title, systemImage: m.symbol).tag(m) }
-            }
-            .pickerStyle(.segmented)
-            .help("Grid (G) · Loupe (E) · Compare (C)")
+            ChoiceBar(options: ViewMode.allCases.map { .init(value: $0, title: $0.title, symbol: $0.symbol, help: Explain.viewMode($0)) },
+                      selection: Binding(get: { session.viewMode }, set: { m in
+                          if m == .compare { session.enterCompare() } else { session.viewMode = m }
+                      }), compact: true)
         }
         ToolbarItemGroup(placement: .primaryAction) {
             if session.writeFailures > 0 {
@@ -234,8 +232,10 @@ struct StatusBar: View {
     private func row(picks: Int, rejects: Int, compact: Bool) -> some View {
         HStack(spacing: 8) {
             Chip(systemImage: "photo.on.rectangle", text: "\(session.matchingCount) of \(session.items.count)")
+                .help("Photos matching the filters, of all photos in the folder")
             if !compact, session.display.count != session.matchingCount {
                 Chip(text: "\(session.display.count) shown")
+                    .help("Thumbnails in the grid — collapsed stacks count once")
             }
             if session.selection.count > 1 { Chip(systemImage: "checkmark.circle", text: "\(session.selection.count) selected", tint: Theme.accentStart) }
             if !compact, session.includeSubfolders { Chip(systemImage: "folder.badge.plus", text: "Subfolders") }

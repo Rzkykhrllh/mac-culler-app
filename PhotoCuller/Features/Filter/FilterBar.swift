@@ -64,12 +64,14 @@ struct FilterBar: View {
             }
             .labelsHidden()
             .frame(width: 48)
+            .help("Rating comparison: at least / exactly / at most")
             Picker("", selection: $session.filter.rating) {
                 Text("Any ★").tag(Int?.none)
                 ForEach(0...5, id: \.self) { r in Text(r == 0 ? "0 ★" : String(repeating: "★", count: r)).tag(Int?.some(r)) }
             }
             .labelsHidden()
             .frame(width: 90)
+            .help("Show only photos with this rating")
         }
         .fixedSize()
     }
@@ -91,6 +93,7 @@ struct FilterBar: View {
                 Text(session.filter.fileTypes.isEmpty ? "All types" : session.filter.fileTypes.map(\.rawValue).sorted().joined(separator: ", "))
             }
             .fixedSize()
+            .help("Show only these file types (RAW, JPEG, HEIC, TIFF, PNG, or RAW+JPG pairs)")
             Toggle(isOn: $session.filter.hasNote) { Image(systemName: "text.bubble") }
                 .toggleStyle(.button)
                 .help("Has note")
@@ -100,6 +103,7 @@ struct FilterBar: View {
                 Label("EXIF", systemImage: session.filter.usesExif ? "camera.fill" : "camera")
             }
             .popover(isPresented: $showExif, arrowEdge: .bottom) { ExifFilterPopover(session: session) }
+            .help("Filter by camera, lens, ISO, focal length, aperture or capture date")
         }
         .fixedSize()
     }
@@ -114,8 +118,10 @@ struct FilterBar: View {
             Text("\(session.matchingCount) of \(session.items.count)")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
+                .help("Photos matching the filters, of all photos in the folder")
             if session.filter.isActive {
                 Button("Clear") { session.filter = FilterState() }
+                    .help("Remove all filters (⌥⌘F)")
             }
         }
         .fixedSize()

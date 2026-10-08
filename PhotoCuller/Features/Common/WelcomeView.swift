@@ -60,7 +60,12 @@ struct WelcomeView: View {
                 TipCard(symbol: "scope", title: "Check focus", text: "F focus peaking · J clipping · Y zooms to the eyes or animal at 100%.")
             }
             .frame(maxWidth: 760)
-            Text("Drop a folder here · press ? anytime for all shortcuts").font(.caption).foregroundStyle(.tertiary)
+            HStack(spacing: 12) {
+                Button { app.showGuide = true } label: { Label("Show the guide", systemImage: "book") }
+                    .buttonStyle(.borderless)
+                    .help("A short tour: folders, RAW+JPG, marking, stacks, compare and focus tools")
+                Text("Drop a folder here · press ? anytime for all shortcuts").font(.caption).foregroundStyle(.tertiary)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(dropTargeted ? Color.accentColor.opacity(0.08) : Color.clear)
