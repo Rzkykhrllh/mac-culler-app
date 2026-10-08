@@ -23,8 +23,18 @@ xcodebuild -project PhotoCuller.xcodeproj -scheme PhotoCuller -derivedDataPath b
 cd Packages/CullerKit && swift test
 ```
 
-The app is signed to run locally (ad-hoc). For Mac App Store / Developer ID distribution set a team and
-signing identity in `project.yml`.
+### Stable signing (so permissions survive rebuilds)
+
+By default the app is signed ad-hoc: every build is a new identity to macOS, so folder access and the
+“access data from other apps” prompt come back after each build. With a free Apple Development certificate
+the identity stays the same:
+
+1. Xcode ▸ Settings ▸ Accounts ▸ **+** ▸ Apple ID (a free account is enough).
+2. Select the account ▸ **Manage Certificates…** ▸ **+** ▸ **Apple Development**.
+3. `./scripts/setup-signing.sh` — writes the git-ignored `Config/Signing.local.xcconfig` and regenerates the project.
+
+Grant folder access once more after the switch; it then persists across builds.
+For Mac App Store / Developer ID distribution use the same file with the matching identity.
 
 ## Layout
 
