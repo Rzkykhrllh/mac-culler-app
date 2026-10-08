@@ -187,6 +187,14 @@ public final class ImagePipeline: @unchecked Sendable {
         item.files.first { $0.kind.isRaster } ?? item.primary
     }
 
+    /// A 400 px image for analysis (feature prints): reuses the grid thumbnail cache, but a single RAW always
+    /// uses its fast camera preview instead of waiting for a True RAW render.
+    public func analysisThumbnail(for item: ItemFiles) async -> CGImage? {
+        let src = thumbnailSource(for: item)
+        if item.isPair || src.rendering == .embedded { return await thumbnail(for: item, priority: .veryLow) }
+        return await load(src.file, .embedded, queue: thumbLoads, priority: .veryLow)
+    }
+
     /// ≈1 ms: the small thumbnail embedded in the file (160 px for camera JPEGs). Placeholder only.
     func quickThumbnail(_ file: FileRef) async -> CGImage? {
         let k = file.cacheKey

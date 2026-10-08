@@ -23,8 +23,12 @@ final class AppSettings {
         didSet { defaults.set(try? JSONEncoder().encode(renamePresets), forKey: Keys.presets) }
     }
     var showDebugOverlay: Bool { didSet { defaults.set(showDebugOverlay, forKey: Keys.debug) } }
-    /// Group consecutive frames into burst stacks (spec §4.4).
+    /// Group photos into stacks at all.
     var stackBursts: Bool { didSet { defaults.set(stackBursts, forKey: Keys.stackBursts) } }
+    /// How stacks are formed: burst timing (spec §4.4) or visual similarity.
+    var groupingMode: GroupingMode { didSet { defaults.set(groupingMode.rawValue, forKey: Keys.grouping) } }
+    /// Vision feature-print distance under which consecutive photos count as similar.
+    var similarityThreshold: Double { didSet { defaults.set(similarityThreshold, forKey: Keys.similarity) } }
     /// RAW look: neutral render from sensor data (default) or the camera's embedded JPEG (film simulation, faster).
     var rawRendering: RawRendering { didSet { defaults.set(rawRendering.rawValue, forKey: Keys.rawRendering) } }
 
@@ -46,6 +50,8 @@ final class AppSettings {
         static let debug = "showDebugOverlay"
         static let rawRendering = "rawRendering"
         static let stackBursts = "stackBursts"
+        static let grouping = "groupingMode"
+        static let similarity = "similarityThreshold"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -53,7 +59,7 @@ final class AppSettings {
         defaults.register(defaults: [
             Keys.pair: true, Keys.burst: 1.0, Keys.subfolders: false, Keys.subfolderWarn: 5000,
             Keys.slots: 2, Keys.pin: false, Keys.sync: true, Keys.finderTags: false,
-            Keys.cacheLimit: 5.0, Keys.thumbSize: 180.0, Keys.debug: false, Keys.stackBursts: true,
+            Keys.cacheLimit: 5.0, Keys.thumbSize: 180.0, Keys.debug: false, Keys.stackBursts: true, Keys.similarity: 0.45,
         ])
         fileViewMode = defaults.string(forKey: Keys.fileView).flatMap(FileViewMode.init(rawValue:))
             ?? (defaults.bool(forKey: Keys.pair) ? .combined : .both)
@@ -68,6 +74,8 @@ final class AppSettings {
         thumbnailSize = defaults.double(forKey: Keys.thumbSize)
         showDebugOverlay = defaults.bool(forKey: Keys.debug)
         stackBursts = defaults.bool(forKey: Keys.stackBursts)
+        groupingMode = defaults.string(forKey: Keys.grouping).flatMap(GroupingMode.init(rawValue:)) ?? .time
+        similarityThreshold = defaults.double(forKey: Keys.similarity)
         rawRendering = defaults.string(forKey: Keys.rawRendering).flatMap(RawRendering.init(rawValue:)) ?? .rendered
         if let d = defaults.data(forKey: Keys.presets), let p = try? JSONDecoder().decode([RenamePreset].self, from: d) {
             renamePresets = p
@@ -122,6 +130,37 @@ enum FileViewMode: String, CaseIterable, Identifiable {
         case .combined, .both: return true
         case .jpegOnly: return files.files.contains { $0.kind.isRaster }
         case .rawOnly: return files.files.contains { $0.kind.isRaw }
+        }
+    }
+}
+
+/// How photos are grouped into stacks.
+enum GroupingMode: String, CaseIterable, Identifiable {
+    /// Burst timing: consecutive frames ≤ the burst threshold apart (spec §4.4).
+    case time
+    /// Visual similarity (Vision feature prints), so a scene shot over several seconds stays together.
+    case similarity
+
+    var id: String { rawValue }
+    var title: String { self == .time ? "Bursts (time)" : "Similar photos" }
+}
+
+/// Stack control as one choice: off, by time, by similarity.
+enum StackChoice: String, CaseIterable, Identifiable {
+    case off, bursts, similar
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .off: return "No Stacks"
+        case .bursts: return "Bursts"
+        case .similar: return "Similar"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .off: return "square"
+        case .bursts: return "square.stack"
+        case .similar: return "square.stack.3d.up.badge.automatic"
         }
     }
 }

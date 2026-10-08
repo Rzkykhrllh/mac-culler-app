@@ -80,12 +80,37 @@ final class AppModel {
         for t in tabs { t.session?.imagesChanged() }
     }
 
-    /// ⇧S: burst stacks on / off (all tabs).
+    /// ⇧S: stacks on / off (all tabs).
     func setStackBursts(_ on: Bool) {
         settings.stackBursts = on
+        regroupAllTabs()
+    }
+
+    var stackChoice: StackChoice {
+        guard settings.stackBursts else { return .off }
+        return settings.groupingMode == .time ? .bursts : .similar
+    }
+
+    func setStackChoice(_ c: StackChoice) {
+        settings.stackBursts = c != .off
+        if c != .off { settings.groupingMode = c == .bursts ? .time : .similarity }
+        regroupAllTabs()
+    }
+
+    /// ⌥[ / ⌥]: tighter / looser similarity (smaller / larger distance threshold).
+    func adjustSimilarity(_ delta: Double) {
+        setSimilarityThreshold(settings.similarityThreshold + delta)
+    }
+
+    func setSimilarityThreshold(_ t: Double) {
+        settings.similarityThreshold = min(1.0, max(0.1, (t * 100).rounded() / 100))
+        for t in tabs where settings.groupingMode == .similarity { t.session?.regroup() }
+    }
+
+    private func regroupAllTabs() {
         for t in tabs {
-            t.session?.rebuildStacks()
-            t.session?.rebuildDisplay()
+            t.session?.regroup()
+            t.session?.ensureFeaturePrints()
         }
     }
 

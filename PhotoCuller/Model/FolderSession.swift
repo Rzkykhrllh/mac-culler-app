@@ -1,5 +1,6 @@
 import AppKit
 import Observation
+import Vision
 import CullerKit
 
 /// Everything about the currently open folder: items, stacks, filter/sort, display list, selection, view mode.
@@ -32,6 +33,14 @@ final class FolderSession {
     @ObservationIgnored var stackMembers: [String: [ItemID]] = [:]
     @ObservationIgnored var stackOf: [ItemID: String] = [:]
     var expandedStacks: Set<String> = []
+
+    // Similarity grouping (Vision feature prints)
+    @ObservationIgnored var featurePrints: [ItemID: VNFeaturePrintObservation] = [:]
+    /// Distances between consecutive photos; reused while only the threshold changes.
+    @ObservationIgnored var similarityPrepared: SimilarityGrouper.Prepared?
+    @ObservationIgnored var similarityTask: Task<Void, Never>?
+    /// (done, total) while feature prints are being computed.
+    var similarityProgress: (done: Int, total: Int)?
 
     // Filter / sort / display
     var filter = FilterState() { didSet { if filter != oldValue { rebuildDisplay() } } }
@@ -146,6 +155,7 @@ final class FolderSession {
         phase = .ready
         startWatching()
         indexMissing()
+        ensureFeaturePrints()
     }
 
     /// Re-applies metadata whose write never reached disk (e.g. failed on a read-only volume last time).
@@ -270,6 +280,7 @@ final class FolderSession {
             if let existing = items[id] {
                 if existing.files != f {
                     existing.files = f
+                    featurePrints[id] = nil
                     if !pendingIDs.contains(id) {
                         existing.metadataLoaded = false
                         existing.exif = nil
@@ -293,6 +304,7 @@ final class FolderSession {
             if currentID == nil { currentID = display.first?.itemID }
         }
         if !changed.isEmpty { indexMissing(changed) }
+        ensureFeaturePrints()
     }
 
     // MARK: Writes
@@ -334,6 +346,7 @@ final class FolderSession {
     // MARK: Close
 
     func close() async {
+        similarityTask?.cancel()
         indexTask?.cancel()
         refreshTask?.cancel()
         watcher?.stop()

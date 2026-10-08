@@ -126,8 +126,20 @@ struct AppCommands: Commands {
             }
             .disabled(!canAct)
             Divider()
-            Toggle("Stack Bursts", isOn: Binding(get: { app.settings.stackBursts }, set: { app.setStackBursts($0) }))
-                .keyboardShortcut("s", modifiers: .shift)
+            Menu("Stacks") {
+                Toggle("Stacks On", isOn: Binding(get: { app.settings.stackBursts }, set: { app.setStackBursts($0) }))
+                    .keyboardShortcut("s", modifiers: .shift)
+                Divider()
+                Toggle("Group Bursts (Time)", isOn: Binding(get: { app.stackChoice == .bursts }, set: { if $0 { app.setStackChoice(.bursts) } }))
+                Toggle("Group Similar Photos", isOn: Binding(get: { app.stackChoice == .similar }, set: { if $0 { app.setStackChoice(.similar) } }))
+                Button("Switch Bursts ↔ Similar") { app.setStackChoice(app.stackChoice == .similar ? .bursts : .similar) }
+                    .keyboardShortcut("s", modifiers: .option)
+                Divider()
+                Button("Stricter Similarity") { app.adjustSimilarity(-0.05) }
+                    .keyboardShortcut("[", modifiers: .option)
+                Button("Looser Similarity") { app.adjustSimilarity(0.05) }
+                    .keyboardShortcut("]", modifiers: .option)
+            }
             Group {
                 Button("Expand / Collapse Selected Stacks") { session?.toggleSelectedStacks() }
                     .keyboardShortcut("s", modifiers: [])

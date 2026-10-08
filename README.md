@@ -76,6 +76,10 @@ Packages/CullerKit/          Core library, fully unit-tested (`swift test`)
 - **True RAW vs camera preview** (⌥⌘R): RAW files are rendered from the sensor data with Core Image by default,
   so they look different from the camera JPEG (no film simulation). “Camera Preview” uses the JPEG embedded in
   the RAW instead (faster, camera look). In “as one photo” mode the pair shows the JPEG, also at 100%.
+- **Stacks: Off · Bursts · Similar** (above the photos; ⇧S on/off, ⌥S bursts ↔ similar). *Bursts* groups frames
+  ≤ 1 s apart (spec §4.4). *Similar* groups consecutive photos that look alike using on-device Vision feature prints
+  (≈130 photos/s, cached in the index), so a scene shot over several seconds stays together; a strict ↔ loose
+  slider (⌥[ / ⌥]) regroups instantly. Different cameras, or photos more than 10 minutes apart, never stack.
 - **Selection**: ⇧/⌘-click, drag, ⇧+arrows. `S` expands/collapses every selected stack. Marks apply to the whole selection.
 - **Right-click** any photo (grid, filmstrip, loupe, compare) for all photo actions, with their shortcuts shown.
 - **Compare**: drag photos from the filmstrip onto the left / right slot; ⌥A switches the filmstrip between the
@@ -116,8 +120,8 @@ CULLER_REAL_RAW_DIR=/path/to/copy/of/a/shoot swift test --filter RealCameraFileT
 
 Use a copy outside protected folders (Documents, Desktop…): the `xctest` helper has no permission to read them.
 
-Similar-photo grouping prototype (Vision feature prints): `swift run -c release culler-similar <folder>` —
-≈130 photos/s on an M2; it prints the groups found at several thresholds.
+Similar-photo grouping on a folder from the command line: `swift run -c release culler-similar <folder>` —
+prints the groups found at several thresholds (useful for tuning).
 
 ## Development aids (Debug builds only)
 
