@@ -74,6 +74,33 @@ struct PhotoCullerApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var menuObserver: Any?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // macOS inserts "Emoji & Symbols" / "Start Dictation" into the Edit menu itself; with custom Edit
+        // commands it can do so twice. Remove duplicates whenever the menu changes.
+        Self.dedupeMenus()
+        menuObserver = NotificationCenter.default.addObserver(forName: NSMenu.didAddItemNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { Self.dedupeMenus() }
+        }
+    }
+
+    static func dedupeMenus() {
+        guard let main = NSApp.mainMenu else { return }
+        for top in main.items {
+            guard let menu = top.submenu else { continue }
+            var seen = Set<String>()
+            for item in menu.items.reversed() where !item.isSeparatorItem {
+                let key = "\(item.title)|\(item.keyEquivalent)|\(item.keyEquivalentModifierMask.rawValue)"
+                if seen.contains(key), item.title.contains("Emoji") || item.title.contains("Dictation") {
+                    menu.removeItem(item)
+                } else {
+                    seen.insert(key)
+                }
+            }
+        }
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // Flush pending metadata writes before quitting (spec §5.3.4).
         Task { @MainActor in
