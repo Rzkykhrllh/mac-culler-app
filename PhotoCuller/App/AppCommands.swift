@@ -275,6 +275,7 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(replacing: .help) {
+            Button("Getting Started") { app.showGuide = true }
             Button("Keyboard Shortcuts") {
                 if let s = session { s.showShortcuts.toggle() } else { openWindow(id: "shortcuts") }
             }

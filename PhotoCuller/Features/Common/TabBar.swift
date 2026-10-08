@@ -195,43 +195,25 @@ struct FileViewSwitcher: View {
 
     private func bar(compact: Bool) -> some View {
         HStack(spacing: compact ? 6 : 8) {
-            Picker("", selection: modeBinding) {
-                ForEach(FileViewMode.allCases) { m in
-                    Text(m.segmentTitle).tag(m).help("\(m.title) (⌥⌘\(String(m.shortcutKey)))")
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .help("RAW + JPEG as one photo · separately · JPEG only · RAW only (⌥⌘1–4)")
+            ChoiceBar(options: FileViewMode.allCases.map {
+                .init(value: $0, title: $0.segmentTitle, help: Explain.fileView($0))
+            }, selection: modeBinding)
 
-            Picker("", selection: stackBinding) {
-                ForEach(StackChoice.allCases) { c in
-                    if compact { Image(systemName: c.symbol).tag(c).help(c.title) } else { Text(c.title).tag(c) }
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .help("Stacks: off · burst timing · visually similar photos (⇧S on/off, ⌥S bursts ↔ similar)")
+            ChoiceBar(options: StackChoice.allCases.map {
+                .init(value: $0, title: $0.title, symbol: $0.symbol, help: Explain.stacks($0))
+            }, selection: stackBinding, compact: compact)
 
             if app.stackChoice == .similar {
                 SimilarityControl()
             }
 
             if showsRawLook {
-                Picker("", selection: rawBinding) {
-                    Text("True RAW").tag(RawRendering.rendered)
-                    Text(compact ? "Camera" : "Camera Preview").tag(RawRendering.embedded)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-                .help("True RAW: rendered from the sensor data, no film simulation. Camera Preview: the JPEG the camera embedded in the RAW (faster, camera look). (⌥⌘R)")
+                ChoiceBar(options: RawRendering.allCases.reversed().map {
+                    .init(value: $0, title: $0 == .rendered ? "True RAW" : (compact ? "Camera" : "Camera Preview"), help: Explain.rawLook($0))
+                }, selection: rawBinding)
             }
         }
-        .controlSize(.small)
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 5)
         .padding(.vertical, 3)
         .glassCapsule()
         .fixedSize()

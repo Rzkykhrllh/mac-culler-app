@@ -80,6 +80,18 @@ struct ThumbnailCollection: NSViewRepresentable {
         private var lastWidth: CGFloat = 0
         private var syncing = false
         private var prefetchTasks: [IndexPath: Task<Void, Never>] = [:]
+        /// Separate RAW/JPEG mode: the partner of the hovered photo, outlined.
+        private var hoveredPartner: ItemID?
+
+        func hoverChanged(_ id: ItemID, _ inside: Bool) {
+            let partner = inside ? parent.session.partner(of: id) : nil
+            guard partner != hoveredPartner, inside || hoveredPartner == parent.session.partner(of: id) else { return }
+            hoveredPartner = partner
+            guard let cv = collectionView else { return }
+            for case let cell as ThumbnailCell in cv.visibleItems() {
+                cell.cellView.isPartnerHighlighted = cell.representedID != nil && cell.representedID == partner
+            }
+        }
 
         init(_ p: ThumbnailCollection) { parent = p }
 
@@ -208,6 +220,9 @@ struct ThumbnailCollection: NSViewRepresentable {
                 }
             }
             cell.cellView.manualClicks = parent.style.isStrip
+            cell.cellView.partnerName = parent.session.partner(of: id).flatMap { parent.session.items[$0]?.fileName }
+            cell.cellView.isPartnerHighlighted = hoveredPartner == id
+            cell.cellView.onHoverChange = { [weak self] inside in self?.hoverChanged(id, inside) }
             cell.cellView.onQuickMark = parent.onQuickMark.map { f in { cmd in f(id, cmd) } }
             if parent.style.isStrip {
                 cell.cellView.isSelectedCell = parent.selection.contains(id)

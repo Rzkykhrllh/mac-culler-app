@@ -28,6 +28,9 @@ final class AppModel {
     /// Incremented whenever the operation log changes so the History window refreshes.
     private(set) var historyRevision = 0
     var alert: AppAlert?
+    /// Getting Started guide (shown automatically on first launch).
+    var showGuide = !UserDefaults.standard.bool(forKey: "hasSeenGuide")
+    func guideClosed() { UserDefaults.standard.set(true, forKey: "hasSeenGuide") }
     /// Caps Lock = auto-advance after marking (spec §9).
     var capsLockOn = NSEvent.modifierFlags.contains(.capsLock)
 
@@ -40,7 +43,7 @@ final class AppModel {
 
         // Restore the tabs of the last launch (folders open lazily when their tab is shown).
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-openFolder") { persistsTabs = false }
+        if ProcessInfo.processInfo.arguments.contains("-openFolder") { persistsTabs = false; showGuide = ProcessInfo.processInfo.arguments.contains("-showGuide") }
         #endif
         let paths = persistsTabs ? (UserDefaults.standard.stringArray(forKey: Keys.tabs) ?? []) : []
         var restored = paths.map { WorkspaceTab(pendingFolder: URL(fileURLWithPath: $0)) }

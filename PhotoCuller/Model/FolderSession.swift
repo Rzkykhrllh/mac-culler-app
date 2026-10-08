@@ -32,6 +32,8 @@ final class FolderSession {
     // Stacks (display-only grouping)
     @ObservationIgnored var stackMembers: [String: [ItemID]] = [:]
     @ObservationIgnored var stackOf: [ItemID: String] = [:]
+    /// folder/basename → items (separate RAW/JPEG modes), for the linked-pair cue.
+    @ObservationIgnored var partnerIndex: [String: [ItemID]] = [:]
     var expandedStacks: Set<String> = []
 
     // Similarity grouping (Vision feature prints)

@@ -149,6 +149,48 @@ enum DebugSelfTest {
         try? await Task.sleep(for: .seconds(2))
         snap("loupe")
         s.viewMode = .grid
+        // Separate mode: hover a JPG, its RAW gets the dashed outline.
+        let savedMode = s.fileView
+        let savedStacks = s.settings.stackBursts
+        s.settings.stackBursts = false
+        s.setFileView(.both)
+        try? await Task.sleep(for: .seconds(4))
+        if let jpgCell = cells(content).first(where: { $0.item?.files.primary.kind == .jpeg && $0.partnerName != nil }) {
+            let r = jpgCell.convert(jpgCell.bounds, to: nil)
+            let p = NSPoint(x: r.midX, y: r.midY)
+            if let enter = NSEvent.enterExitEvent(with: .mouseEntered, location: p, modifierFlags: [], timestamp: 0, windowNumber: w.windowNumber,
+                                                  context: nil, eventNumber: 0, trackingNumber: 0, userData: nil) {
+                jpgCell.mouseEntered(with: enter)
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            let lit = cells(content).filter(\.isPartnerHighlighted).compactMap { $0.item?.fileName }
+            Log.session.info("SNAP partner of \(jpgCell.item?.fileName ?? "?", privacy: .public) highlighted: \(lit, privacy: .public)")
+            snap("separate-hover")
+            if let exit = NSEvent.enterExitEvent(with: .mouseExited, location: p, modifierFlags: [], timestamp: 0, windowNumber: w.windowNumber,
+                                                 context: nil, eventNumber: 0, trackingNumber: 0, userData: nil) {
+                jpgCell.mouseExited(with: exit)
+            }
+        }
+        s.setFileView(savedMode)
+        s.settings.stackBursts = savedStacks
+        s.regroup()
+        try? await Task.sleep(for: .seconds(2))
+        // Guide pages.
+        s.app.showGuide = true
+        try? await Task.sleep(for: .seconds(1))
+        if let sheet = w.attachedSheet, let sc = sheet.contentView {
+            func snapSheet(_ n: String) {
+                sc.layoutSubtreeIfNeeded()
+                if let rep = sc.bitmapImageRepForCachingDisplay(in: sc.bounds) {
+                    sc.cacheDisplay(in: sc.bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(n + ".png"))
+                }
+            }
+            snapSheet("guide-1")
+            for _ in 0..<2 { if let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: sheet.windowNumber, context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36) { sheet.sendEvent(e) } ; try? await Task.sleep(for: .milliseconds(400)) }
+            snapSheet("guide-3")
+            s.app.showGuide = false
+        }
         // Undo the demo marks.
         for _ in 0..<(cmds.count + 1) { s.undo() }
         try? await Task.sleep(for: .milliseconds(1500))

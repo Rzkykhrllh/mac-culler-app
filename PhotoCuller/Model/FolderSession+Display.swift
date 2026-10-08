@@ -58,6 +58,7 @@ extension FolderSession {
 
     /// Recomputes the filtered, sorted display list (spec §7: stacks stay intact, shown if ≥1 member matches).
     func rebuildDisplay() {
+        rebuildPartnerIndex()
         let f = filter
         let filterActive = f.isActive
         let mode = fileView
@@ -140,6 +141,25 @@ extension FolderSession {
     func imagesChanged() {
         imageRevision += 1
         displayRevision += 1
+    }
+
+    /// Separate RAW/JPEG modes: the other file of the same shot (same folder + base name), if shown as its own photo.
+    func partner(of id: ItemID) -> ItemID? {
+        guard !fileView.pairs, let item = items[id] else { return nil }
+        let base = item.files.folder.appendingPathComponent(item.files.baseName).path
+        let wantRaw = !item.files.primary.kind.isRaw
+        return partnerIndex[base]?.first { $0 != id && items[$0]?.files.primary.kind.isRaw == wantRaw }
+    }
+
+    /// Rebuilds the base-name → items index used by `partner(of:)`.
+    func rebuildPartnerIndex() {
+        var idx: [String: [ItemID]] = [:]
+        if !fileView.pairs {
+            for item in items.values {
+                idx[item.files.folder.appendingPathComponent(item.files.baseName).path, default: []].append(item.id)
+            }
+        }
+        partnerIndex = idx
     }
 
     /// Item IDs of the members of a stack that pass the filter.
