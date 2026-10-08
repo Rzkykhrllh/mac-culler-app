@@ -28,6 +28,9 @@ struct CompareView: View {
         }
         .onAppear { syncLoaders() }
         .onChange(of: session.compare.slots) { syncLoaders() }
+        .onChange(of: session.imageRevision) {
+            for (i, id) in session.compare.slots.enumerated() where loaders.indices.contains(i) { loaders[i].reload(id.flatMap { session.items[$0] }) }
+        }
         .onChange(of: session.compare.syncZoom) { session.viewports.sync = session.compare.syncZoom }
     }
 

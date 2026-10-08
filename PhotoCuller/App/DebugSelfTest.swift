@@ -119,12 +119,49 @@ enum DebugSelfTest {
         check(s.matchingCount == (start == .combined ? combined : both), "back to \(start.rawValue)")
 
         // Sidebar tree.
-        let wasPinned = s.app.sidebar.root(containing: s.folder) != nil
-        s.app.sidebar.add(s.folder)
-        let node = await s.app.sidebar.reveal(s.folder)
+        let sidebar = s.app.sidebar
+        let wasPinned = sidebar.isPinned(s.folder)
+        sidebar.pin(s.folder)
+        let node = await sidebar.reveal(s.folder)
         await node?.load()
         check(node?.photoCount == combined, "sidebar counts \(node?.photoCount ?? -1) photos")
-        if !wasPinned, let root = s.app.sidebar.root(containing: s.folder) { s.app.sidebar.remove(root) }
+        check(sidebar.favorites.count == 5 && !sidebar.locations.isEmpty, "Finder-like favorites (\(sidebar.favorites.map(\.name))) + \(sidebar.locations.count) locations")
+        if let home = sidebar.favorites.first {
+            await home.load(force: true)
+            check(home.needsAccess != AccessGrants.canRead(home.url), "home folder access state matches sandbox (locked: \(home.needsAccess))")
+        }
+        if !wasPinned, let n = sidebar.pinned.first(where: { $0.url == s.folder.standardizedFileURL }) { sidebar.unpin(n) }
+
+        // Tabs: a second workspace on the same folder keeps its own state; switching back restores the first.
+        let app = s.app
+        let firstTab = app.activeTab
+        s.viewMode = .grid
+        s.select(s.display[1].itemID)
+        let keepCurrent = s.currentID
+        let t2 = app.newTab(folder: s.folder)
+        for _ in 0..<80 where t2.session?.phase != .ready { try? await Task.sleep(for: .milliseconds(100)) }
+        check(app.tabs.count >= 2 && app.session === t2.session && t2.session !== s, "new tab opens its own session")
+        t2.session?.viewMode = .loupe
+        app.selectTab(firstTab)
+        check(app.session === s && s.currentID == keepCurrent && s.viewMode == .grid, "switching back restores tab 1 state")
+        app.selectTab(t2)
+        check(app.session?.viewMode == .loupe, "tab 2 kept its own view mode")
+        app.closeTab(t2)
+        check(app.activeTab === firstTab && app.session === s, "closing tab returns to tab 1")
+
+        // Menu bar: no two commands may share a shortcut.
+        var seen: [String: String] = [:]
+        var dupes: [String] = []
+        func walk(_ m: NSMenu, _ path: String) {
+            for it in m.items {
+                if let sub = it.submenu { walk(sub, path + it.title + " > ") }
+                guard !it.keyEquivalent.isEmpty else { continue }
+                let key = "\(it.keyEquivalentModifierMask.intersection([.command, .shift, .option, .control, .function]).rawValue)-\(it.keyEquivalent.lowercased())"
+                if let other = seen[key] { dupes.append("\(other) ↔ \(path + it.title)") } else { seen[key] = path + it.title }
+            }
+        }
+        if let main = NSApp.mainMenu { walk(main, "") }
+        check(dupes.isEmpty, "no duplicate menu shortcuts \(dupes) (\(seen.count) shortcuts)")
 
         let st = s.app.pipeline.stats
         Log.session.info("SELFTEST stats thumbs=\(st.thumbRequests) gen=\(st.thumbGenerated) previews=\(st.previewRequests) lastPreviewMs=\(st.lastPreviewMs)")

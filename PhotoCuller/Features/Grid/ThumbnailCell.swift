@@ -8,6 +8,7 @@ final class ThumbnailCell: NSCollectionViewItem {
     var cellView: ThumbnailCellView { view as! ThumbnailCellView }
     private var loadTask: Task<Void, Never>?
     private(set) var representedID: ItemID?
+    private var representedKey: String?
 
     override func loadView() {
         view = ThumbnailCellView(frame: .zero)
@@ -22,6 +23,7 @@ final class ThumbnailCell: NSCollectionViewItem {
         loadTask?.cancel()
         loadTask = nil
         representedID = nil
+        representedKey = nil
         cellView.item = nil
         cellView.image = nil
         cellView.isCurrent = false
@@ -30,8 +32,10 @@ final class ThumbnailCell: NSCollectionViewItem {
 
     func configure(entry: DisplayEntry, item: PhotoItem, pipeline: ImagePipeline, compact: Bool,
                    isCurrent: Bool, compareSlot: Int?) {
-        let changed = representedID != item.id
+        let key = pipeline.renderKey(item.files.primary)
+        let changed = representedID != item.id || representedKey != key
         representedID = item.id
+        representedKey = key
         cellView.entry = entry
         cellView.item = item
         cellView.compact = compact

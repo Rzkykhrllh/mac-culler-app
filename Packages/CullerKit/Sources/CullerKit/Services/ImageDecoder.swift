@@ -2,6 +2,14 @@ import Foundation
 import ImageIO
 import CoreImage
 
+/// How RAW files are shown.
+public enum RawRendering: String, Sendable, CaseIterable {
+    /// The JPEG preview embedded by the camera: fastest, but already has the camera's look (e.g. film simulation).
+    case embedded
+    /// Demosaiced from the sensor data with Core Image: the neutral, "real" RAW.
+    case rendered
+}
+
 /// Stateless decode routines for the three representations of an item (spec §3 pipeline).
 public enum ImageDecoder {
     static let ciContext = CIContext(options: [.cacheIntermediates: false, .name: "PhotoCuller.raw"])
@@ -22,28 +30,34 @@ public enum ImageDecoder {
 
     /// ~400 px thumbnail. RAW: prefer the embedded preview (no full decode). Raster: downsampled decode
     /// (the EXIF thumbnail of a JPEG is usually too small to use).
-    public static func thumbnail(for file: FileRef, maxPixel: Int = 400) -> CGImage? {
+    public static func thumbnail(for file: FileRef, maxPixel: Int = 400, raw: RawRendering = .embedded) -> CGImage? {
         guard let src = source(file.url) else { return nil }
+        if file.kind.isRaw, raw == .rendered, let r = rawPreviewViaCoreImage(file.url, maxPixel: maxPixel, draft: true) {
+            return r
+        }
         if file.kind.isRaw {
             if let t = thumbnail(src, maxPixel: maxPixel, always: false), max(t.width, t.height) >= maxPixel * 6 / 10 {
                 return t
             }
-            if let p = rawPreviewViaCoreImage(file.url, maxPixel: maxPixel) { return p }
+            if let p = rawPreviewViaCoreImage(file.url, maxPixel: maxPixel, draft: true) { return p }
             return thumbnail(src, maxPixel: maxPixel, always: true)
         }
         return thumbnail(src, maxPixel: maxPixel, always: true)
     }
 
     /// Screen-sized preview. RAW: the embedded full-size JPEG preview; raster: downsampled decode.
-    public static func preview(for file: FileRef, maxPixel: Int) -> CGImage? {
+    public static func preview(for file: FileRef, maxPixel: Int, raw: RawRendering = .embedded) -> CGImage? {
         guard let src = source(file.url) else { return nil }
+        if file.kind.isRaw, raw == .rendered, let r = rawPreviewViaCoreImage(file.url, maxPixel: maxPixel, draft: false) {
+            return r
+        }
         if file.kind.isRaw {
             if let t = thumbnail(src, maxPixel: maxPixel, always: false),
                max(t.width, t.height) >= min(maxPixel, 1600) {
                 return t
             }
             // Embedded preview missing or tiny: draft-mode RAW decode at reduced scale.
-            return rawPreviewViaCoreImage(file.url, maxPixel: maxPixel) ?? thumbnail(src, maxPixel: maxPixel, always: false)
+            return rawPreviewViaCoreImage(file.url, maxPixel: maxPixel, draft: true) ?? thumbnail(src, maxPixel: maxPixel, always: false)
         }
         return thumbnail(src, maxPixel: maxPixel, always: true)
     }
@@ -62,12 +76,13 @@ public enum ImageDecoder {
         return thumbnail(src, maxPixel: max(w, h), always: true)
     }
 
-    static func rawPreviewViaCoreImage(_ url: URL, maxPixel: Int) -> CGImage? {
+    /// RAW decoded from sensor data at reduced scale (orientation applied). Draft mode = faster, lower quality demosaic.
+    static func rawPreviewViaCoreImage(_ url: URL, maxPixel: Int, draft: Bool) -> CGImage? {
         guard let filter = CIRAWFilter(imageURL: url) else { return nil }
         let native = filter.nativeSize
         let longEdge = max(native.width, native.height)
         if longEdge > 0 { filter.scaleFactor = Float(min(1, CGFloat(maxPixel) / longEdge)) }
-        filter.isDraftModeEnabled = true
+        filter.isDraftModeEnabled = draft
         guard let out = filter.outputImage else { return nil }
         return ciContext.createCGImage(out, from: out.extent, format: .RGBA8,
                                        colorSpace: CGColorSpace(name: CGColorSpace.displayP3))

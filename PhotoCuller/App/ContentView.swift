@@ -9,10 +9,14 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $app.sidebarVisibility) {
             FolderSidebarView()
         } detail: {
-            Group {
+            VStack(spacing: 0) {
+                TabBar()
                 if let s = app.session {
+                    PathBar(session: s)
                     SessionView(session: s)
                         .id(ObjectIdentifier(s))
+                } else if app.activeTab.pendingFolder != nil {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     WelcomeView()
                         .toolbar {
@@ -24,6 +28,7 @@ struct ContentView: View {
             }
             .appBackdrop()
         }
+        .onAppear { app.activateRestoredTabIfNeeded() }
         .frame(minWidth: 1000, minHeight: 620)
         .background(WindowAccessor { window in
             KeyboardController.shared.mainWindow = window
@@ -138,15 +143,6 @@ struct SessionToolbar: ToolbarContent {
                 }
                 .help("Some marks could not be written (e.g. read-only volume). They are kept and retried. Click to retry now (⇧⌘S).")
             }
-            Menu {
-                Picker("Show", selection: Binding(get: { session.fileView }, set: { session.setFileView($0) })) {
-                    ForEach(FileViewMode.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.inline)
-            } label: {
-                Label(session.fileView.shortTitle, systemImage: "square.stack.3d.down.right")
-            }
-            .help("RAW / JPEG display (⌥⌘1–4)")
             if session.viewMode == .grid {
                 Slider(value: Binding(get: { session.settings.thumbnailSize }, set: { session.settings.thumbnailSize = $0 }), in: 90...480)
                     .frame(width: 110)

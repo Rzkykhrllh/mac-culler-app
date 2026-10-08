@@ -31,6 +31,14 @@ final class SlotImageLoader {
         return Int(min(4096, max(1600, s)))
     }
 
+    /// Re-requests the current photo (cached representations under the old RAW look are not reused).
+    func reload(_ item: PhotoItem?) {
+        files = nil
+        itemID = nil
+        image = nil
+        show(item)
+    }
+
     func show(_ item: PhotoItem?) {
         guard let item else {
             task?.cancel(); fullTask?.cancel()

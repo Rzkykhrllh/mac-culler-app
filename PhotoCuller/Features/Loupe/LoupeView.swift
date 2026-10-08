@@ -47,6 +47,7 @@ struct LoupeView: View {
         .onAppear { show() }
         .onChange(of: session.currentID) { show() }
         .onChange(of: session.currentItem?.files) { show() }
+        .onChange(of: session.imageRevision) { loader.reload(session.currentItem); prefetch() }
     }
 
     private func show() {

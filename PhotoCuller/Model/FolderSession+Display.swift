@@ -105,6 +105,12 @@ extension FolderSession {
         if selection.isEmpty, let c = currentID { selection = [c] }
     }
 
+    /// Forces every view to re-request its images (e.g. after the RAW look changed).
+    func imagesChanged() {
+        imageRevision += 1
+        displayRevision += 1
+    }
+
     /// Item IDs of the members of a stack that pass the filter.
     func visibleMembers(ofStack sid: String) -> [ItemID] {
         guard let members = stackMembers[sid] else { return [] }

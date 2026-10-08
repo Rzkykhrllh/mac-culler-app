@@ -61,8 +61,8 @@ struct WelcomeView: View {
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first, (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { return false }
             app.recentFolders.add(url)
-            app.sidebar.add(url)
-            app.open(folder: url, securityScoped: false)
+            app.sidebar.adopt(url)
+            app.open(folder: url)
             return true
         } isTargeted: { dropTargeted = $0 }
     }

@@ -14,7 +14,8 @@ struct StatusOverlay: View {
             if !minimal {
                 HStack(spacing: 10) {
                     Text(item.fileName).fontWeight(.semibold)
-                    if item.files.isPair { Text(item.files.badge).font(.caption2).padding(.horizontal, 4).background(.white.opacity(0.15), in: Capsule()) }
+                    Text(kindBadge).font(.caption2.weight(.semibold)).padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(.white.opacity(0.15), in: Capsule())
                     if showsPosition, let i = session.currentIndex, item.id == session.currentID {
                         Text("\(i + 1) / \(session.display.count)").foregroundStyle(.secondary)
                     }
@@ -32,6 +33,16 @@ struct StatusOverlay: View {
         .padding(.vertical, 9)
         .glassCard(14)
         .foregroundStyle(.white)
+    }
+}
+
+extension StatusOverlay {
+    /// "RAW · True RAW", "RAW · Camera preview", "JPG", "RAW+JPG".
+    var kindBadge: String {
+        let f = item.files
+        if f.isPair { return f.badge }
+        guard f.primary.kind.isRaw else { return f.primary.kind.badge }
+        return f.primary.kind.badge + (session.app.settings.rawRendering == .rendered ? " · True RAW" : " · Camera preview")
     }
 }
 

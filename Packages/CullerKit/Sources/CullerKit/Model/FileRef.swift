@@ -53,8 +53,10 @@ public struct ItemFiles: Hashable, Sendable, Codable {
     public var primary: FileRef { files[0] }
     /// The RAW file of the item, if any (used for 100% zoom).
     public var raw: FileRef? { files.first { $0.kind.isRaw } }
-    /// The file decoded for 100% zoom: RAW when present, else the primary.
-    public var fullResolutionSource: FileRef { raw ?? primary }
+    /// The file decoded for 100% zoom: the displayed file itself. For a RAW+JPEG pair that is the
+    /// full-size JPEG, so zooming keeps the same (camera) look instead of switching to a neutral RAW render;
+    /// RAW-only items (and RAW in the separate modes) decode the RAW.
+    public var fullResolutionSource: FileRef { primary }
     public var isPair: Bool { files.count > 1 }
 
     public var folder: URL { primary.url.deletingLastPathComponent() }

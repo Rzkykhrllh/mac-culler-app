@@ -13,10 +13,12 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
+            Button("New Tab") { app.newTab() }
+                .keyboardShortcut("t")
             Button("Open Folder…") { app.showOpenPanel() }
                 .keyboardShortcut("o")
-            Button("Add Folder to Sidebar…") { app.showOpenPanel() }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
+            Button("Open Folder in New Tab…") { app.showOpenPanel(newTab: true) }
+                .keyboardShortcut("o", modifiers: [.command, .option])
             Menu("Open Recent") {
                 ForEach(app.recentFolders.entries) { e in
                     Button(e.path) { app.open(recent: e) }
@@ -30,6 +32,10 @@ struct AppCommands: Commands {
                     if session != nil { app.reopenCurrent(includeSubfolders: v) } else { app.settings.includeSubfoldersByDefault = v }
                 }))
                 .keyboardShortcut("i", modifiers: [.command, .option])
+            Button("Close Tab") { app.closeTab() }
+                .keyboardShortcut("w")
+            Button("Reopen Closed Tab") { app.reopenClosedTab() }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
             Button("Close Folder") { Task { await app.closeSession() } }
                 .keyboardShortcut("w", modifiers: [.command, .shift])
                 .disabled(session == nil)
@@ -154,6 +160,9 @@ struct AppCommands: Commands {
                         .keyboardShortcut(KeyEquivalent(m.shortcutKey), modifiers: [.command, .option])
                 }
             }
+            Toggle("True RAW (no camera look)", isOn: Binding(get: { app.settings.rawRendering == .rendered },
+                                                               set: { app.setRawRendering($0 ? .rendered : .embedded) }))
+                .keyboardShortcut("r", modifiers: [.command, .option])
             Menu("Sort By") {
                 ForEach(Array(SortKey.allCases.enumerated()), id: \.offset) { i, k in
                     Toggle(k.rawValue, isOn: Binding(get: { session?.sort.key == k }, set: { if $0 { session?.sort.key = k } }))
@@ -170,7 +179,7 @@ struct AppCommands: Commands {
                         if session?.viewMode != .compare { session?.enterCompare() }
                         session?.compare.setSlotCount(n)
                     }
-                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: [.command, .control])
+                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .option)
                 }
                 Divider()
                 Toggle("Sync Zoom & Pan", isOn: Binding(get: { session?.compare.syncZoom ?? true }, set: { session?.compare.syncZoom = $0 }))
@@ -209,6 +218,17 @@ struct AppCommands: Commands {
         }
 
         CommandMenu("Go") {
+            Button("Home") { app.openFromSidebar(AccessGrants.realHome) }
+                .keyboardShortcut("h", modifiers: [.command, .shift])
+            Button("Desktop") { app.openFromSidebar(AccessGrants.realHome.appendingPathComponent("Desktop")) }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+            Button("Documents") { app.openFromSidebar(AccessGrants.realHome.appendingPathComponent("Documents")) }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+            Button("Downloads") { app.openFromSidebar(AccessGrants.realHome.appendingPathComponent("Downloads")) }
+                .keyboardShortcut("l", modifiers: [.command, .option])
+            Button("Pictures") { app.openFromSidebar(AccessGrants.realHome.appendingPathComponent("Pictures")) }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+            Divider()
             Button("Enclosing Folder") { app.openParentFolder() }
                 .keyboardShortcut(.upArrow, modifiers: .command)
             Button("Next Folder") { app.openNeighbourFolder(1) }
@@ -218,6 +238,16 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .windowArrangement) {
+            Divider()
+            Button("Show Next Tab") { app.cycleTab(1) }
+                .keyboardShortcut(.tab, modifiers: .control)
+            Button("Show Previous Tab") { app.cycleTab(-1) }
+                .keyboardShortcut(.tab, modifiers: [.control, .shift])
+            ForEach(1...9, id: \.self) { n in
+                Button(n == 9 ? "Last Tab" : "Tab \(n)") { app.selectTab(number: n) }
+                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .command)
+            }
+            Divider()
             Button("Operation History") { openWindow(id: "history") }
                 .keyboardShortcut("y", modifiers: [.command, .shift])
         }

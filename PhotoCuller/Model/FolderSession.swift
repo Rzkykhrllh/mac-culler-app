@@ -42,6 +42,8 @@ final class FolderSession {
     var matchingCount = 0
     /// Bumped on every display rebuild — AppKit collection views reload on change.
     var displayRevision = 0
+    /// Bumped when cached images become stale (RAW look switched).
+    var imageRevision = 0
 
     // Selection & navigation
     var viewMode: ViewMode = .grid
