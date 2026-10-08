@@ -96,6 +96,25 @@ struct SessionView: View {
                     if session.app.settings.showDebugOverlay {
                         DebugOverlay(pipeline: session.app.pipeline)
                     }
+                    VStack(spacing: 6) {
+                        if let t = session.toast {
+                            Text(t).font(.callout.weight(.medium))
+                                .padding(.horizontal, 14).padding(.vertical, 8)
+                                .glassCapsule()
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                        if session.viewMode != .grid && (session.showPeaking || session.showClipping) {
+                            HStack(spacing: 6) {
+                                if session.showPeaking { Chip(systemImage: "scope", text: "Focus peaking  F", tint: Color(red: 1, green: 0.35, blue: 0.3)) }
+                                if session.showClipping { Chip(systemImage: "circle.lefthalf.filled", text: "Clipping  J", tint: .white) }
+                            }
+                            .padding(4).glassCapsule()
+                        }
+                        Spacer()
+                    }
+                    .padding(.top, 10)
+                    .allowsHitTesting(false)
+                    .animation(.smooth(duration: 0.2), value: session.toast)
                 }
                 if !session.isFullScreen && session.viewMode == .grid {
                     Color.clear.frame(height: 44) // room for the floating status bar
@@ -211,6 +230,10 @@ struct StatusBar: View {
             if let p = session.indexing {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: compact ? 40 : 70).controlSize(.small)
                 if !compact { Chip(text: "Indexing \(p.done)/\(p.total)") }
+            }
+            if let p = session.analysisProgress {
+                ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: compact ? 40 : 70).controlSize(.small)
+                if !compact { Chip(systemImage: "scope", text: "Checking focus \(p.done)/\(p.total)") }
             }
             if let p = session.similarityProgress {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: compact ? 40 : 70).controlSize(.small)

@@ -50,6 +50,21 @@ final class RealCameraFileTests: XCTestCase {
         XCTAssertGreaterThan(d, 2, "True RAW render should differ visibly from the camera's preview (mean Δ \(d))")
     }
 
+    func testPeakingOnRealPhotoFavorsSubject() throws {
+        let (raw, _) = try realPair()
+        let img = try XCTUnwrap(ImageDecoder.preview(for: try XCTUnwrap(FileRef.load(raw)), maxPixel: 2560, raw: .embedded))
+        let peak = try XCTUnwrap(FocusOverlays.peaking(img))
+        let total = FocusOverlays.coverage(peak)
+        XCTAssertGreaterThan(total, 0.003, "something is in focus")
+        XCTAssertLessThan(total, 0.3, "not everything is painted")
+        let analysis = FocusAnalyzer.analyze(try XCTUnwrap(ImageDecoder.preview(for: try XCTUnwrap(FileRef.load(raw)), maxPixel: 1600, raw: .embedded)))
+        if let subject = analysis.subjects.first {
+            XCTAssertGreaterThan(FocusOverlays.coverage(peak, in: subject.rect), total, "the subject has more in-focus edges than the frame average")
+        }
+        let clip = try XCTUnwrap(FocusOverlays.clipping(img))
+        XCTAssertLessThan(FocusOverlays.coverage(clip), 0.1, "a normal exposure is barely clipped")
+    }
+
     func testRealPairPipelineAndFullDecode() async throws {
         let (raw, jpg) = try realPair()
         let item = try XCTUnwrap(TestSupport.items(raw.deletingLastPathComponent()).first { $0.isPair })

@@ -18,6 +18,12 @@ struct PhotoCullerApp: App {
                     Log.session.info("Launch arguments: \(args, privacy: .public)")
                     if let i = args.firstIndex(of: "-openFolder"), args.indices.contains(i + 1) {
                         app.open(folder: URL(fileURLWithPath: args[i + 1]), securityScoped: false)
+                        if args.contains("-focusTest") {
+                            Task {
+                                while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
+                                await DebugSelfTest.runFocus(app.session!)
+                            }
+                        }
                         if args.contains("-similarityTest") {
                             Task {
                                 while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }

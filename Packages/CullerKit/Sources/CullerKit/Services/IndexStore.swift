@@ -66,6 +66,14 @@ public final class IndexStore: Sendable {
                 t.column("data", .blob).notNull()
             }
         }
+        m.registerMigration("v3-analysis") { db in
+            try db.create(table: "analysis") { t in
+                t.primaryKey("path", .text)
+                t.column("size", .integer).notNull()
+                t.column("mtime", .double).notNull()
+                t.column("json", .blob).notNull()
+            }
+        }
         return m
     }
 
@@ -140,6 +148,35 @@ public final class IndexStore: Sendable {
             for (f, d) in entries {
                 try db.execute(sql: "INSERT OR REPLACE INTO featurePrint (path, size, mtime, data) VALUES (?, ?, ?, ?)",
                                arguments: [f.path, f.size, f.modificationDate.timeIntervalSince1970, d])
+            }
+        }
+    }
+
+    // MARK: Focus analysis
+
+    public func cachedAnalysis(for files: [FileRef]) -> [String: PhotoAnalysis] {
+        guard !files.isEmpty else { return [:] }
+        let wanted = Dictionary(files.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
+        var out: [String: PhotoAnalysis] = [:]
+        try? db.read { db in
+            for row in try Self.fetch(db, table: "analysis", columns: "path, size, mtime, json", key: "path", values: Array(wanted.keys)) {
+                let path: String = row["path"]
+                guard let f = wanted[path], f.size == row["size"] as Int64,
+                      abs(f.modificationDate.timeIntervalSince1970 - (row["mtime"] as Double)) < 0.001,
+                      let a = try? Self.decoder.decode(PhotoAnalysis.self, from: row["json"] as Data) else { continue }
+                out[path] = a
+            }
+        }
+        return out
+    }
+
+    public func storeAnalysis(_ entries: [(FileRef, PhotoAnalysis)]) {
+        guard !entries.isEmpty else { return }
+        try? db.write { db in
+            for (f, a) in entries {
+                guard let data = try? Self.encoder.encode(a) else { continue }
+                try db.execute(sql: "INSERT OR REPLACE INTO analysis (path, size, mtime, json) VALUES (?, ?, ?, ?)",
+                               arguments: [f.path, f.size, f.modificationDate.timeIntervalSince1970, data])
             }
         }
     }
@@ -223,6 +260,7 @@ public final class IndexStore: Sendable {
         try? db.write { db in
             try db.execute(sql: "DELETE FROM exif")
             try db.execute(sql: "DELETE FROM featurePrint")
+            try db.execute(sql: "DELETE FROM analysis")
             try db.execute(sql: "DELETE FROM itemMeta")
         }
     }

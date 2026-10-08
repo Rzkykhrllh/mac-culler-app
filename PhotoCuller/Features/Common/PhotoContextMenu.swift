@@ -84,6 +84,15 @@ enum PhotoContextMenu {
             menu.addItem(ActionMenuItem(title, key: "s") { s.toggleSelectedStacks() })
         }
 
+        if s.viewMode != .grid {
+            menu.addItem(ActionMenuItem("Zoom to Eyes / Face", key: "y") { s.zoomToSubject() })
+        }
+        if !stacks.isEmpty {
+            menu.addItem(ActionMenuItem("Go to Sharpest in Stack", key: "b") { s.goToSharpest() })
+        }
+        menu.addItem(check(ActionMenuItem("Focus Peaking", key: "f") { s.showPeaking.toggle() }, s.showPeaking))
+        menu.addItem(check(ActionMenuItem("Clipping", key: "j") { s.showClipping.toggle() }, s.showClipping))
+
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("Rename…", key: String(UnicodeScalar(NSF2FunctionKey)!)) { s.activeSheet = .rename })
         menu.addItem(ActionMenuItem("Move…", key: "m", modifiers: [.command, .shift]) { s.activeSheet = .move })

@@ -149,6 +149,7 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
             _ = item.writeState
             _ = item.decodeFailed
             _ = item.files
+            _ = item.isSharpestInStack
         } onChange: { [weak self, weak item] in
             DispatchQueue.main.async {
                 guard let self, let item, self.item === item else { return }
@@ -276,6 +277,12 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
         case .pick: drawSymbol("flag.fill", at: NSPoint(x: inner.minX, y: inner.minY), color: .white)
         case .reject: drawSymbol("xmark.circle.fill", at: NSPoint(x: inner.minX, y: inner.minY), color: .systemRed)
         case .none: break
+        }
+
+        // Sharpest frame of its stack: a hint for picking the keeper.
+        if item?.isSharpestInStack == true {
+            let x = inner.minX + (meta.flag == .none ? 0 : 22)
+            drawSymbol("scope", at: NSPoint(x: x, y: inner.minY), color: NSColor(calibratedRed: 0.45, green: 1, blue: 0.55, alpha: 1), size: compact ? 10 : 12)
         }
 
         // Pair badge (top-right).

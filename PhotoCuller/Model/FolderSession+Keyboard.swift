@@ -29,6 +29,15 @@ extension FolderSession {
             compare.syncZoom.toggle()
         case .togglePinBest:
             compare.pinBest.toggle()
+        case .togglePeaking:
+            showPeaking.toggle()
+        case .toggleClipping:
+            showClipping.toggle()
+        case .zoomToSubject:
+            guard viewMode != .grid else { return false }
+            zoomToSubject()
+        case .sharpest:
+            goToSharpest()
         case .toggleStripShowsAll:
             guard viewMode == .compare else { return false }
             setCompareStripShowsAll(!compare.stripShowsAll)

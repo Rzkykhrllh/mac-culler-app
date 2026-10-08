@@ -42,6 +42,17 @@ final class FolderSession {
     /// (done, total) while feature prints are being computed.
     var similarityProgress: (done: Int, total: Int)?
 
+    // Focus analysis
+    @ObservationIgnored var analysisTask: Task<Void, Never>?
+    var analysisProgress: (done: Int, total: Int)?
+    var showPeaking = false
+    var showClipping = false
+    /// Short message shown over the photos (e.g. "No face found").
+    var toast: String?
+    @ObservationIgnored var toastTask: Task<Void, Never>?
+    /// Which subject Y zoomed to last, per item (pressing Y again cycles).
+    @ObservationIgnored var subjectCycle: [ItemID: Int] = [:]
+
     // Filter / sort / display
     var filter = FilterState() { didSet { if filter != oldValue { rebuildDisplay() } } }
     var sort = CullerKit.SortOrder() { didSet { if sort != oldValue { rebuildDisplay() } } }
@@ -156,6 +167,7 @@ final class FolderSession {
         startWatching()
         indexMissing()
         ensureFeaturePrints()
+        ensureAnalysis()
     }
 
     /// Re-applies metadata whose write never reached disk (e.g. failed on a read-only volume last time).
@@ -304,7 +316,9 @@ final class FolderSession {
             if currentID == nil { currentID = display.first?.itemID }
         }
         if !changed.isEmpty { indexMissing(changed) }
+        for item in changed { item.analysis = nil }
         ensureFeaturePrints()
+        ensureAnalysis()
     }
 
     // MARK: Writes
@@ -347,6 +361,7 @@ final class FolderSession {
 
     func close() async {
         similarityTask?.cancel()
+        analysisTask?.cancel()
         indexTask?.cancel()
         refreshTask?.cancel()
         watcher?.stop()

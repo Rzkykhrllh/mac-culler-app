@@ -195,6 +195,15 @@ public final class ImagePipeline: @unchecked Sendable {
         return await load(src.file, .embedded, queue: thumbLoads, priority: .veryLow)
     }
 
+    /// A ~1600 px image for focus analysis. Not cached (analysed once, results go to the index).
+    /// Pairs and RAWs use the camera's embedded preview (fast; sharpness is the same as in the JPEG).
+    public func analysisImage(for item: ItemFiles, maxPixel: Int = 1600) async -> CGImage? {
+        let file: FileRef = item.isPair ? (Self.rawEngineReady ? (item.raw ?? item.primary) : item.primary) : item.primary
+        return await previewLoads.load(key: "analysis#\(file.cacheKey)", priority: .veryLow) {
+            ImageDecoder.preview(for: file, maxPixel: maxPixel, raw: .embedded)
+        }
+    }
+
     /// ≈1 ms: the small thumbnail embedded in the file (160 px for camera JPEGs). Placeholder only.
     func quickThumbnail(_ file: FileRef) async -> CGImage? {
         let k = file.cacheKey

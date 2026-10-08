@@ -47,6 +47,7 @@ extension FolderSession {
             stackMembers[sid] = g
             for id in g { stackOf[id] = sid }
         }
+        updateSharpest()
         // Keep stacks expanded across rebuilds when they still contain the same first frames.
         var expanded: Set<String> = []
         for members in previousExpanded {

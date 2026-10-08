@@ -25,6 +25,10 @@ final class PhotoItem: Identifiable {
     var writeState: WriteState = .saved
     /// Set when the image could not be decoded (e.g. a RAW from a camera newer than this macOS).
     var decodeFailed = false
+    /// Faces / animals + subject sharpness (background analysis).
+    var analysis: PhotoAnalysis?
+    /// The sharpest frame of its stack (a hint; the user decides).
+    var isSharpestInStack = false
 
     init(files: ItemFiles, metadata: PhotoMetadata = .empty, exif: ExifInfo? = nil, metadataLoaded: Bool = false) {
         id = files.primary.path

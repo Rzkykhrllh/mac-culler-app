@@ -44,13 +44,12 @@ extension FolderSession {
                     for await r in g { if let r { out.append(r) } }
                     return out
                 }
-                let prints: [(Int, Data)] = await Task.detached(priority: .utility) {
-                    let box = PrintBox()
-                    DispatchQueue.concurrentPerform(iterations: images.count) { k in
-                        if let d = FeaturePrints.compute(from: images[k].1) { box.add(images[k].0, d) }
-                    }
-                    return box.values
-                }.value
+                let prints: [(Int, Data)] = await withTaskGroup(of: (Int, Data)?.self) { g in
+                    for (i, img) in images { g.addTask { await Offload.run { FeaturePrints.compute(from: img).map { (i, $0) } } } }
+                    var out: [(Int, Data)] = []
+                    for await r in g { if let r { out.append(r) } }
+                    return out
+                }
                 if Task.isCancelled { return }
                 var stored: [(FileRef, Data)] = []
                 for (i, d) in prints {
@@ -69,11 +68,4 @@ extension FolderSession {
             self.regroup()
         }
     }
-}
-
-nonisolated private final class PrintBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var items: [(Int, Data)] = []
-    func add(_ i: Int, _ d: Data) { lock.withLock { items.append((i, d)) } }
-    var values: [(Int, Data)] { lock.withLock { items } }
 }
