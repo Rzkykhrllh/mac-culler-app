@@ -17,6 +17,7 @@ struct GridView: View {
                 session.selection = sel
                 if let clicked {
                     session.currentID = clicked
+                    if sel.count == 1 { session.selectionAnchor = clicked }
                 } else if let cur = session.currentID, !sel.contains(cur), let first = sel.first {
                     session.currentID = first
                 }
@@ -25,7 +26,8 @@ struct GridView: View {
                 session.select(id)
                 session.viewMode = .loupe
             },
-            onToggleStack: { session.toggleStack($0) }
+            onToggleStack: { session.toggleStack($0) },
+            contextMenu: { PhotoContextMenu.make(session) }
         )
         .overlay {
             if session.display.isEmpty && session.phase == .ready {
@@ -53,7 +55,8 @@ struct FilmstripView: View {
             selection: highlighted, compareSlots: compareSlots, style: .strip(height: 96), allowsMultipleSelection: false,
             onSelectionChange: { _, clicked in if let clicked { onPick(clicked) } },
             onActivate: { onPick($0) },
-            onToggleStack: { session.toggleStack($0) }
+            onToggleStack: { session.toggleStack($0) },
+            contextMenu: { PhotoContextMenu.make(session) }
         )
         .frame(height: 96)
     }

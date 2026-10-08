@@ -75,9 +75,9 @@ struct FilterBar: View {
             }
         }
         .controlSize(.small)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(.bar)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .glassCard(16)
     }
 
     private func flagToggle(_ f: Flag, _ symbol: String, _ help: String) -> some View {

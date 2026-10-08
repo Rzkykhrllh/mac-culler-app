@@ -13,18 +13,22 @@ extension FolderSession {
         case .mark(let cmd):
             apply(cmd, advance: m.advance)
         case .next:
-            viewMode == .compare ? stepActiveSlot(1) : move(1)
+            viewMode == .compare ? stepActiveSlot(1) : move(1, extend: m.extend && viewMode == .grid)
         case .previous:
-            viewMode == .compare ? stepActiveSlot(-1) : move(-1)
+            viewMode == .compare ? stepActiveSlot(-1) : move(-1, extend: m.extend && viewMode == .grid)
         case .up, .down:
             guard viewMode == .grid else { return false }
-            move((m.action == .up ? -1 : 1) * max(1, gridColumns))
+            move((m.action == .up ? -1 : 1) * max(1, gridColumns), extend: m.extend)
         case .nextUnflagged:
             moveToUnflagged(1)
         case .previousUnflagged:
             moveToUnflagged(-1)
         case .toggleStack:
-            toggleCurrentStack()
+            toggleSelectedStacks()
+        case .toggleSyncZoom:
+            compare.syncZoom.toggle()
+        case .togglePinBest:
+            compare.pinBest.toggle()
         case .showGrid:
             viewMode = .grid
         case .showLoupe:

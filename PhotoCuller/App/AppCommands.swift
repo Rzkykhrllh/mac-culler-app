@@ -1,18 +1,22 @@
 import SwiftUI
 import CullerKit
 
-/// Menu bar. Single-key shortcuts are handled by `KeyboardController` (menus would also fire while typing),
-/// so menu titles show them as hints; ⌘ shortcuts are real key equivalents here.
+/// Menu bar: every action is here with its shortcut (spec §9).
+/// Single-key shortcuts are normally handled first by `KeyboardController`; while typing, keystrokes go
+/// straight to the text field, so these key equivalents never fire by accident.
 struct AppCommands: Commands {
     let app: AppModel
     @Environment(\.openWindow) private var openWindow
 
     private var session: FolderSession? { app.session }
+    private var canAct: Bool { session?.phase == .ready && session?.activeSheet == nil && session?.editingNote == nil }
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("Open Folder…") { app.showOpenPanel() }
                 .keyboardShortcut("o")
+            Button("Add Folder to Sidebar…") { app.showOpenPanel() }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
             Menu("Open Recent") {
                 ForEach(app.recentFolders.entries) { e in
                     Button(e.path) { app.open(recent: e) }
@@ -25,19 +29,22 @@ struct AppCommands: Commands {
                 set: { v in
                     if session != nil { app.reopenCurrent(includeSubfolders: v) } else { app.settings.includeSubfoldersByDefault = v }
                 }))
+                .keyboardShortcut("i", modifiers: [.command, .option])
             Button("Close Folder") { Task { await app.closeSession() } }
+                .keyboardShortcut("w", modifiers: [.command, .shift])
                 .disabled(session == nil)
             Divider()
-            Button("Rename…  (F2)") { session?.activeSheet = .rename }
-                .disabled(session == nil)
+            Button("Rename…") { session?.activeSheet = .rename }
+                .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF2FunctionKey)!)), modifiers: [])
+                .disabled(!canAct)
             Button("Move…") { session?.activeSheet = .move }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
-                .disabled(session == nil)
+                .disabled(!canAct)
             Button("Copy…") { session?.activeSheet = .copy }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
-                .disabled(session == nil)
+                .disabled(!canAct)
             Button("Reveal in Finder") {
-                if let i = session?.currentItem { NSWorkspace.shared.activateFileViewerSelecting(i.files.allURLs) }
+                if let s = session { NSWorkspace.shared.activateFileViewerSelecting(s.markTargets.flatMap(\.files.allURLs)) }
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .disabled(session?.currentItem == nil)
@@ -52,57 +59,157 @@ struct AppCommands: Commands {
                 .disabled(!(session?.canRedo ?? false))
         }
 
+        // Standard text editing still works in text fields; outside them ⌘A selects all photos.
+        CommandGroup(replacing: .pasteboard) {
+            Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }.keyboardShortcut("x")
+            Button("Copy") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }.keyboardShortcut("c")
+            Button("Paste") { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }.keyboardShortcut("v")
+            Button("Select All") {
+                if KeyboardController.isEditingText || session == nil {
+                    NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
+                } else {
+                    session?.selectAll()
+                }
+            }
+            .keyboardShortcut("a")
+            Button("Deselect All") { session?.selection = session?.currentID.map { [$0] } ?? [] }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
+                .disabled(session == nil)
+        }
+
         CommandMenu("Photo") {
-            Button("Pick  (P)") { session?.apply(.flag(.pick)) }
-            Button("Reject  (X)") { session?.apply(.flag(.reject)) }
-            Button("Unflag  (U)") { session?.apply(.flag(.none)) }
+            Group {
+                Button("Pick") { session?.apply(.flag(.pick)) }.keyboardShortcut("p", modifiers: [])
+                Button("Reject") { session?.apply(.flag(.reject)) }.keyboardShortcut("x", modifiers: [])
+                Button("Unflag") { session?.apply(.flag(.none)) }.keyboardShortcut("u", modifiers: [])
+                Button("Pick and Next") { session?.apply(.flag(.pick), advance: true) }.keyboardShortcut("p", modifiers: .shift)
+                Button("Reject and Next") { session?.apply(.flag(.reject), advance: true) }.keyboardShortcut("x", modifiers: .shift)
+            }
+            .disabled(!canAct)
             Divider()
             Menu("Rating") {
                 ForEach(0...5, id: \.self) { r in
-                    Button(r == 0 ? "None  (0)" : "\(String(repeating: "★", count: r))  (\(r))") { session?.apply(.rating(r)) }
+                    Button(r == 0 ? "No Rating" : String(repeating: "★", count: r)) { session?.apply(.rating(r)) }
+                        .keyboardShortcut(KeyEquivalent(Character("\(r)")), modifiers: [])
                 }
             }
+            .disabled(!canAct)
             Menu("Color Label") {
-                Button("Red  (6)") { session?.apply(.toggleLabel(.red)) }
-                Button("Yellow  (7)") { session?.apply(.toggleLabel(.yellow)) }
-                Button("Green  (8)") { session?.apply(.toggleLabel(.green)) }
-                Button("Blue  (9)") { session?.apply(.toggleLabel(.blue)) }
-                Button("Purple") { session?.apply(.toggleLabel(.purple)) }
+                Button("Red") { session?.apply(.toggleLabel(.red)) }.keyboardShortcut("6", modifiers: [])
+                Button("Yellow") { session?.apply(.toggleLabel(.yellow)) }.keyboardShortcut("7", modifiers: [])
+                Button("Green") { session?.apply(.toggleLabel(.green)) }.keyboardShortcut("8", modifiers: [])
+                Button("Blue") { session?.apply(.toggleLabel(.blue)) }.keyboardShortcut("9", modifiers: [])
+                Button("Purple") { session?.apply(.toggleLabel(.purple)) }.keyboardShortcut("9", modifiers: .option)
                 Divider()
-                Button("None") { session?.apply(.setLabel(.none)) }
+                Button("No Label") { session?.apply(.setLabel(.none)) }.keyboardShortcut("0", modifiers: .option)
             }
-            Button("Edit Note…  (M)") { session?.beginNoteEditing() }
+            .disabled(!canAct)
+            Button("Edit Note…") { session?.beginNoteEditing() }
+                .keyboardShortcut("m", modifiers: [])
+                .disabled(!canAct)
             Divider()
-            Button("Next Unflagged  (⌥→)") { session?.moveToUnflagged(1) }
-            Button("Previous Unflagged  (⌥←)") { session?.moveToUnflagged(-1) }
+            Group {
+                Button("Next Photo") { session?.viewMode == .compare ? session?.stepActiveSlot(1) : session?.move(1) }
+                    .keyboardShortcut(.rightArrow, modifiers: [])
+                Button("Previous Photo") { session?.viewMode == .compare ? session?.stepActiveSlot(-1) : session?.move(-1) }
+                    .keyboardShortcut(.leftArrow, modifiers: [])
+                Button("Next Unflagged") { session?.moveToUnflagged(1) }
+                    .keyboardShortcut(.rightArrow, modifiers: .option)
+                Button("Previous Unflagged") { session?.moveToUnflagged(-1) }
+                    .keyboardShortcut(.leftArrow, modifiers: .option)
+            }
+            .disabled(!canAct)
             Divider()
-            Button("Expand / Collapse Stack  (S)") { session?.toggleCurrentStack() }
-            Button("Expand All Stacks") { session?.expandAllStacks(true) }
-            Button("Collapse All Stacks") { session?.expandAllStacks(false) }
+            Group {
+                Button("Expand / Collapse Selected Stacks") { session?.toggleSelectedStacks() }
+                    .keyboardShortcut("s", modifiers: [])
+                Button("Expand All Stacks") { session?.expandAllStacks(true) }
+                    .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
+                Button("Collapse All Stacks") { session?.expandAllStacks(false) }
+                    .keyboardShortcut(.leftArrow, modifiers: [.command, .option])
+            }
+            .disabled(!canAct)
             Divider()
             Button("Retry Failed Saves") { session?.retryFailedWrites() }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled((session?.writeFailures ?? 0) == 0)
         }
 
         CommandGroup(before: .toolbar) {
-            Button("Grid  (G)") { session?.viewMode = .grid }
-            Button("Loupe  (E)") { if session?.currentID != nil { session?.viewMode = .loupe } }
-            Button("Compare  (C)") { session?.enterCompare() }
-            Divider()
-            Button("Toggle 100% Zoom  (Z)") {
-                guard let s = session else { return }
-                s.viewports.toggleZoom(slot: s.viewMode == .compare ? s.compare.active : 0)
+            Group {
+                Button("Grid") { session?.viewMode = .grid }.keyboardShortcut("g", modifiers: [])
+                Button("Loupe") { if session?.currentID != nil { session?.viewMode = .loupe } }.keyboardShortcut("e", modifiers: [])
+                Button("Compare") { session?.enterCompare() }.keyboardShortcut("c", modifiers: [])
+                Button("Toggle 100% Zoom") {
+                    guard let s = session else { return }
+                    s.viewports.toggleZoom(slot: s.viewMode == .compare ? s.compare.active : 0)
+                }
+                .keyboardShortcut("z", modifiers: [])
             }
-            Button("Info Panel  (I)") { session?.showInfoPanel.toggle() }
-            Button("Histogram  (H)") { session?.showHistogram.toggle() }
+            .disabled(!canAct)
+            Menu("RAW + JPEG") {
+                ForEach(FileViewMode.allCases) { m in
+                    Toggle(m.title, isOn: Binding(get: { (session?.fileView ?? app.settings.fileViewMode) == m },
+                                                  set: { if $0 { if let s = session { s.setFileView(m) } else { app.settings.fileViewMode = m } } }))
+                        .keyboardShortcut(KeyEquivalent(m.shortcutKey), modifiers: [.command, .option])
+                }
+            }
+            Menu("Sort By") {
+                ForEach(Array(SortKey.allCases.enumerated()), id: \.offset) { i, k in
+                    Toggle(k.rawValue, isOn: Binding(get: { session?.sort.key == k }, set: { if $0 { session?.sort.key = k } }))
+                        .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: [.command, .control])
+                }
+                Divider()
+                Toggle("Descending", isOn: Binding(get: { session?.sort.ascending == false }, set: { session?.sort.ascending = !$0 }))
+                    .keyboardShortcut("r", modifiers: [.command, .control])
+            }
+            .disabled(session == nil)
+            Menu("Compare") {
+                ForEach(2...4, id: \.self) { n in
+                    Button("\(n) Slots") {
+                        if session?.viewMode != .compare { session?.enterCompare() }
+                        session?.compare.setSlotCount(n)
+                    }
+                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: [.command, .control])
+                }
+                Divider()
+                Toggle("Sync Zoom & Pan", isOn: Binding(get: { session?.compare.syncZoom ?? true }, set: { session?.compare.syncZoom = $0 }))
+                    .keyboardShortcut("z", modifiers: .option)
+                Toggle("Pin Current Best", isOn: Binding(get: { session?.compare.pinBest ?? false }, set: { session?.compare.pinBest = $0 }))
+                    .keyboardShortcut("p", modifiers: .option)
+            }
+            .disabled(session == nil)
+            Divider()
+            Group {
+                Toggle("Info Panel", isOn: Binding(get: { session?.showInfoPanel ?? false }, set: { session?.showInfoPanel = $0 }))
+                    .keyboardShortcut("i", modifiers: [])
+                Toggle("Histogram", isOn: Binding(get: { session?.showHistogram ?? false }, set: { session?.showHistogram = $0 }))
+                    .keyboardShortcut("h", modifiers: [])
+            }
+            .disabled(!canAct)
             Button("Find / Filter") { NotificationCenter.default.post(name: .focusFilterBar, object: nil) }
                 .keyboardShortcut("f")
+                .disabled(session == nil)
+            Button("Clear Filters") { session?.filter = FilterState() }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+                .disabled(!(session?.filter.isActive ?? false))
             Divider()
-            Button("Larger Thumbnails") { app.settings.thumbnailSize = min(420, app.settings.thumbnailSize + 30) }
-                .keyboardShortcut("+")
-            Button("Smaller Thumbnails") { app.settings.thumbnailSize = max(90, app.settings.thumbnailSize - 30) }
+            Button("Larger Thumbnails") { app.settings.thumbnailSize = min(480, app.settings.thumbnailSize + 40) }
+                .keyboardShortcut("=")
+            Button("Smaller Thumbnails") { app.settings.thumbnailSize = max(90, app.settings.thumbnailSize - 40) }
                 .keyboardShortcut("-")
+            Button(app.sidebarVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar") { app.toggleSidebar() }
+                .keyboardShortcut("s", modifiers: [.command, .control])
             Divider()
+        }
+
+        CommandMenu("Go") {
+            Button("Enclosing Folder") { app.openParentFolder() }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+            Button("Next Folder") { app.openNeighbourFolder(1) }
+                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+            Button("Previous Folder") { app.openNeighbourFolder(-1) }
+                .keyboardShortcut(.upArrow, modifiers: [.command, .option])
         }
 
         CommandGroup(after: .windowArrangement) {
@@ -117,7 +224,9 @@ struct AppCommands: Commands {
 
         CommandMenu("Debug") {
             Toggle("Show Debug Overlay", isOn: Binding(get: { app.settings.showDebugOverlay }, set: { app.settings.showDebugOverlay = $0 }))
+                .keyboardShortcut("d", modifiers: [.command, .option])
             Button("Clear Caches") { app.clearCaches() }
+                .keyboardShortcut("k", modifiers: [.command, .option, .shift])
         }
     }
 }

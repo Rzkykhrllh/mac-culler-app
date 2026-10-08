@@ -62,12 +62,23 @@ Packages/CullerKit/          Core library, fully unit-tested (`swift test`)
   empty values instead), and ImageIO cannot parse an XMP packet with no properties (written by hand
   and recognized with an XML parser).
 
+## Folders, RAW+JPEG modes, selection
+
+- **Sidebar tree**: add a parent folder once (⌘O / ⇧⌘O / drop it on the window). Every subfolder can then be
+  opened with one click; the root's security-scoped bookmark keeps sandbox access. ⌘↑ / ⌥⌘↓ / ⌥⌘↑ move between folders.
+- **RAW + JPEG** (⌥⌘1–4): *as one photo* (marks apply to both files), *separately*, *JPEG only*, *RAW only*.
+  The separate modes treat each file as its own photo so RAW and JPEG can be marked differently
+  (when switching back to "one photo", the RAW sidecar's values win).
+- **Selection**: ⇧/⌘-click, drag, ⇧+arrows. `S` expands/collapses every selected stack. Marks apply to the whole selection.
+- **Right-click** any photo (grid, filmstrip, loupe, compare) for all photo actions, with their shortcuts shown.
+
 ## Keyboard
 
 Lightroom-compatible: `P`/`X`/`U` flag, `0`–`5` rating, `6`–`9` labels, `⇧`+key marks and advances,
 Caps Lock auto-advance, `←`/`→`, `⌥←`/`⌥→` unflagged, `G`/`E`/`C` views, `Z`/Space 100%, `Tab` compare slot,
-`S` stack, `I` info, `H` histogram, `M` note, `F2` rename, `⌘⇧M`/`⌘⇧C` move/copy. **Help ▸ Keyboard
-Shortcuts** lists them all, generated from `Shared/KeyMap.swift`.
+`S` stack, `I` info, `H` histogram, `M` note, `⌥9` purple, `⌥0` clear label, `F2` rename, `⌘⇧M`/`⌘⇧C` move/copy.
+Every menu command has a shortcut; **Help ▸ Keyboard Shortcuts** (⌘/) lists them all. While typing in a text
+field, plain keys go straight to the field, so single-key shortcuts never fire by accident.
 
 ## Development aids (Debug builds only)
 

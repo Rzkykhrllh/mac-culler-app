@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Observation
 import CullerKit
 
@@ -13,6 +14,12 @@ final class AppModel {
     let operationLog: OperationLog
     let recentFolders = RecentFolders(key: "recentFolders")
     let recentDestinations = RecentFolders(key: "recentDestinations", limit: 8)
+    let sidebar = FolderSidebar()
+    var sidebarVisibility: NavigationSplitViewVisibility = .all
+
+    func toggleSidebar() {
+        sidebarVisibility = sidebarVisibility == .detailOnly ? .all : .detailOnly
+    }
     @ObservationIgnored private(set) var writeQueue: MetadataWriteQueue!
 
     private(set) var session: FolderSession?
@@ -49,7 +56,27 @@ final class AppModel {
         panel.message = "Choose a folder of photos to cull"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         recentFolders.add(url)
+        sidebar.add(url)
         open(folder: url, securityScoped: false)
+    }
+
+    /// Opens a folder from the sidebar tree (its root keeps the sandbox access open).
+    func openFromSidebar(_ url: URL) {
+        guard url.standardizedFileURL != session?.folder.standardizedFileURL else { return }
+        recentFolders.add(url)
+        open(folder: url, securityScoped: false)
+    }
+
+    /// ⌥⌘↓ / ⌥⌘↑: next / previous folder in the sidebar tree.
+    func openNeighbourFolder(_ offset: Int) {
+        guard let cur = session?.folder, let next = sidebar.neighbour(of: cur, offset: offset) else { NSSound.beep(); return }
+        openFromSidebar(next)
+    }
+
+    /// ⌘↑: enclosing folder.
+    func openParentFolder() {
+        guard let cur = session?.folder, let p = sidebar.parentURL(of: cur) else { NSSound.beep(); return }
+        openFromSidebar(p)
     }
 
     func open(recent entry: RecentFolders.Entry) {
@@ -59,6 +86,10 @@ final class AppModel {
             return
         }
         recentFolders.add(url)
+        // Pin it in the sidebar; the scope stays open for the app's lifetime like other sidebar roots.
+        if sidebar.root(containing: url) == nil, url.startAccessingSecurityScopedResource() {
+            sidebar.add(url)
+        }
         open(folder: url, securityScoped: true)
     }
 
@@ -74,9 +105,10 @@ final class AppModel {
                 }
             }
             Log.session.info("Opening \(url.path, privacy: .public) (subfolders: \(subfolders))")
-            let accessing = securityScoped ? url.startAccessingSecurityScopedResource() : false
+            let accessing = securityScoped && sidebar.root(containing: url) == nil ? url.startAccessingSecurityScopedResource() : false
             let s = FolderSession(folder: url, includeSubfolders: subfolders, app: self, stopAccessingOnClose: accessing)
             session = s
+            Task { await sidebar.reveal(url) }
             await s.load()
         }
     }

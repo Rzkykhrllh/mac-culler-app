@@ -7,7 +7,9 @@ import CullerKit
 final class AppSettings {
     private let defaults: UserDefaults
 
-    var pairRawWithRaster: Bool { didSet { defaults.set(pairRawWithRaster, forKey: Keys.pair) } }
+    /// How RAW+JPEG pairs are shown (spec §4.3 "Treat RAW+JPEG as one photo", extended with separate modes).
+    var fileViewMode: FileViewMode { didSet { defaults.set(fileViewMode.rawValue, forKey: Keys.fileView) } }
+    var pairRawWithRaster: Bool { fileViewMode == .combined }
     var burstThreshold: Double { didSet { defaults.set(burstThreshold, forKey: Keys.burst) } }
     var includeSubfoldersByDefault: Bool { didSet { defaults.set(includeSubfoldersByDefault, forKey: Keys.subfolders) } }
     var subfolderWarningThreshold: Int { didSet { defaults.set(subfolderWarningThreshold, forKey: Keys.subfolderWarn) } }
@@ -26,6 +28,7 @@ final class AppSettings {
 
     private enum Keys {
         static let pair = "pairRawWithRaster"
+        static let fileView = "fileViewMode"
         static let burst = "burstThreshold"
         static let subfolders = "includeSubfoldersByDefault"
         static let subfolderWarn = "subfolderWarningThreshold"
@@ -46,7 +49,8 @@ final class AppSettings {
             Keys.slots: 2, Keys.pin: false, Keys.sync: true, Keys.finderTags: false,
             Keys.cacheLimit: 5.0, Keys.thumbSize: 180.0, Keys.debug: false,
         ])
-        pairRawWithRaster = defaults.bool(forKey: Keys.pair)
+        fileViewMode = defaults.string(forKey: Keys.fileView).flatMap(FileViewMode.init(rawValue:))
+            ?? (defaults.bool(forKey: Keys.pair) ? .combined : .both)
         burstThreshold = defaults.double(forKey: Keys.burst)
         includeSubfoldersByDefault = defaults.bool(forKey: Keys.subfolders)
         subfolderWarningThreshold = defaults.integer(forKey: Keys.subfolderWarn)
@@ -61,6 +65,46 @@ final class AppSettings {
             renamePresets = p
         } else {
             renamePresets = RenamePreset.defaults
+        }
+    }
+}
+
+/// RAW+JPEG display mode. "Combined" pairs them into one photo (marks apply to both files);
+/// the other modes treat every file as its own photo so RAW and JPEG can be marked separately.
+enum FileViewMode: String, CaseIterable, Identifiable {
+    case combined, both, jpegOnly, rawOnly
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .combined: return "RAW+JPEG as One Photo"
+        case .both: return "RAW and JPEG Separately"
+        case .jpegOnly: return "JPEG Only"
+        case .rawOnly: return "RAW Only"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .combined: return "RAW+JPEG"
+        case .both: return "Separate"
+        case .jpegOnly: return "JPEG"
+        case .rawOnly: return "RAW"
+        }
+    }
+
+    /// ⌥⌘1 … ⌥⌘4
+    var shortcutKey: Character { ["1", "2", "3", "4"][Self.allCases.firstIndex(of: self)!] }
+
+    var pairs: Bool { self == .combined }
+
+    /// Whether an item is shown in this mode (only meaningful for unpaired items).
+    func shows(_ files: ItemFiles) -> Bool {
+        switch self {
+        case .combined, .both: return true
+        case .jpegOnly: return files.files.contains { $0.kind.isRaster }
+        case .rawOnly: return files.files.contains { $0.kind.isRaw }
         }
     }
 }

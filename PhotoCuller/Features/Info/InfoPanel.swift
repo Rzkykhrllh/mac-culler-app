@@ -11,8 +11,9 @@ struct InfoPanel: View {
                 Form {
                     Section("Marks") {
                         MarksView(metadata: item.metadata, writeState: item.writeState)
-                            .padding(4)
-                            .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .glassCapsule()
                         if item.metadata.hasNote {
                             Text(item.metadata.note).textSelection(.enabled)
                         }
@@ -95,8 +96,8 @@ struct HistogramView: View {
                 ctx.fill(p, with: .color(color.opacity(0.45)))
             }
         }
-        .padding(6)
-        .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
+        .padding(8)
+        .glassCard(12)
         .task(id: ObjectIdentifier(image)) {
             let img = image
             histogram = await Task.detached(priority: .utility) { Histogram.compute(img) }.value

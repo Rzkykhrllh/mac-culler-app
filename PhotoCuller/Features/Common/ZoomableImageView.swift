@@ -114,6 +114,8 @@ final class ImageCanvasView: NSView {
         addCursorRect(visibleRect, cursor: sv.isFit ? .crosshair : .openHand)
     }
 
+    override func menu(for event: NSEvent) -> NSMenu? { scrollView?.menu(for: event) }
+
     override func mouseDown(with event: NSEvent) {
         dragStart = event.locationInWindow
         dragOrigin = scrollView?.contentView.bounds.origin ?? .zero
@@ -151,6 +153,7 @@ final class ZoomScrollView: NSScrollView {
     var slot = 0
     var onActivate: (() -> Void)?
     var onZoomChange: ((Bool) -> Void)?
+    var contextMenuProvider: (() -> NSMenu?)?
     private(set) var isFit = true
     private var reporting = true
     private(set) var pixelSize: CGSize = .zero
@@ -299,6 +302,11 @@ final class ZoomScrollView: NSScrollView {
         hub?.viewportChanged(slot: slot, currentViewport, independent: independent)
     }
 
+    override func menu(for event: NSEvent) -> NSMenu? {
+        onActivate?()
+        return contextMenuProvider?()
+    }
+
     override func scrollWheel(with event: NSEvent) {
         // Trackpad two-finger scrolling pans when zoomed; when fit there is nothing to pan.
         guard !isFit else { return }
@@ -323,6 +331,7 @@ struct ZoomableImage: NSViewRepresentable {
     var hub: ViewportHub
     var onActivate: () -> Void = {}
     var onZoomChange: (Bool) -> Void = { _ in }
+    var contextMenu: () -> NSMenu? = { nil }
 
     final class Coordinator {
         var contentID: String?
@@ -340,6 +349,7 @@ struct ZoomableImage: NSViewRepresentable {
     func updateNSView(_ v: ZoomScrollView, context: Context) {
         v.onActivate = onActivate
         v.onZoomChange = onZoomChange
+        v.contextMenuProvider = contextMenu
         if hub.view(slot: slot) !== v { hub.register(v, slot: slot) }
         let c = context.coordinator
         if c.contentID != contentID {

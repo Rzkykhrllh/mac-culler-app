@@ -16,6 +16,8 @@ enum KeyAction: Equatable {
     case editNote
     case rename
     case escape
+    case toggleSyncZoom
+    case togglePinBest
 }
 
 struct KeyBinding {
@@ -27,6 +29,8 @@ struct KeyBinding {
     var key: Key
     /// Shift variant applies the action and then advances once (marking keys only).
     var shiftAdvances = false
+    /// Shift variant extends the selection (arrow keys in the grid).
+    var shiftExtends = false
     var option = false
     var action: KeyAction
     var title: String
@@ -61,13 +65,17 @@ enum KeyMap {
             b.append(.init(key: .character(k), shiftAdvances: true, action: .mark(.toggleLabel(l)), title: "\(l.displayName) label"))
         }
         b += [
-            .init(key: .code(KeyCode.rightArrow), action: .next, title: "Next photo"),
-            .init(key: .code(KeyCode.leftArrow), action: .previous, title: "Previous photo"),
-            .init(key: .code(KeyCode.upArrow), action: .up, title: "Up (grid)"),
-            .init(key: .code(KeyCode.downArrow), action: .down, title: "Down (grid)"),
+            .init(key: .character("9"), option: true, action: .mark(.toggleLabel(.purple)), title: "Purple label"),
+            .init(key: .character("0"), option: true, action: .mark(.setLabel(.none)), title: "Clear label"),
+            .init(key: .code(KeyCode.rightArrow), shiftExtends: true, action: .next, title: "Next photo (⇧ extends selection)"),
+            .init(key: .code(KeyCode.leftArrow), shiftExtends: true, action: .previous, title: "Previous photo (⇧ extends selection)"),
+            .init(key: .code(KeyCode.upArrow), shiftExtends: true, action: .up, title: "Up (grid)"),
+            .init(key: .code(KeyCode.downArrow), shiftExtends: true, action: .down, title: "Down (grid)"),
             .init(key: .code(KeyCode.rightArrow), option: true, action: .nextUnflagged, title: "Next unflagged"),
             .init(key: .code(KeyCode.leftArrow), option: true, action: .previousUnflagged, title: "Previous unflagged"),
-            .init(key: .character("s"), action: .toggleStack, title: "Expand / collapse stack"),
+            .init(key: .character("s"), action: .toggleStack, title: "Expand / collapse selected stacks"),
+            .init(key: .character("z"), option: true, action: .toggleSyncZoom, title: "Compare: sync zoom & pan"),
+            .init(key: .character("p"), option: true, action: .togglePinBest, title: "Compare: pin current best"),
             .init(key: .character("g"), action: .showGrid, title: "Grid"),
             .init(key: .character("e"), action: .showLoupe, title: "Loupe"),
             .init(key: .character("c"), action: .showCompare, title: "Compare"),
@@ -88,6 +96,7 @@ enum KeyMap {
     struct Match {
         var action: KeyAction
         var advance: Bool
+        var extend = false
     }
 
     /// Resolves an event to an action. Events with ⌘ or ⌃ are left to the menus.
@@ -106,9 +115,9 @@ enum KeyMap {
             case .code(let code): keyMatches = event.keyCode == code
             }
             guard keyMatches, b.option == option else { continue }
-            if shift && !b.shiftAdvances { continue }
+            if shift && !b.shiftAdvances && !b.shiftExtends { continue }
             let isMark: Bool = { if case .mark = b.action { return true } else { return false } }()
-            return Match(action: b.action, advance: isMark && (shift || autoAdvance))
+            return Match(action: b.action, advance: isMark && (shift || autoAdvance), extend: shift && b.shiftExtends)
         }
         return nil
     }

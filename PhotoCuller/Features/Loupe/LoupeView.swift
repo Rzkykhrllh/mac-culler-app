@@ -13,10 +13,10 @@ struct LoupeView: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack {
-                Color(white: 0.08)
                 ZoomableImage(image: loader.image, pixelSize: loader.pixelSize, contentID: loader.itemID,
                               isFullResolution: loader.isFullResolution, slot: 0, hub: session.viewports,
-                              onZoomChange: { loader.setZoomed($0) })
+                              onZoomChange: { loader.setZoomed($0) },
+                              contextMenu: { PhotoContextMenu.make(session) })
                 ImageStateOverlay(loader: loader)
                 if let item = session.currentItem {
                     VStack {
@@ -33,11 +33,14 @@ struct LoupeView: View {
                 }
             }
             if !session.isFullScreen {
-                Divider()
                 FilmstripView(session: session, entries: session.display, revision: session.displayRevision,
                               currentID: session.currentID, highlighted: Set([session.currentID].compactMap { $0 })) { id in
                     session.select(id)
                 }
+                .padding(4)
+                .glassCard(18)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 10)
             }
         }
         .onAppear { show() }
@@ -84,8 +87,9 @@ struct ImageStateOverlay: View {
                     Spacer()
                     Label("Loading full resolution…", systemImage: "circle.dotted")
                         .font(.caption)
-                        .padding(6)
-                        .background(.black.opacity(0.5), in: RoundedRectangle(cornerRadius: 6))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .glassCapsule()
                         .foregroundStyle(.white)
                 }
                 Spacer()
