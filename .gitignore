@@ -6,3 +6,4 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 Config/Signing.local.xcconfig
+PhotoCuller.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
