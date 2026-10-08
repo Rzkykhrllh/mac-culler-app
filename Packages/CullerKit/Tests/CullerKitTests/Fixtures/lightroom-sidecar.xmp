@@ -1,0 +1,46 @@
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 7.0-c000 1.000000, 0000/00/00-00:00:00        ">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:xmp="http://ns.adobe.com/xap/1.0/"
+    xmlns:tiff="http://ns.adobe.com/tiff/1.0/"
+    xmlns:exif="http://ns.adobe.com/exif/1.0/"
+    xmlns:aux="http://ns.adobe.com/exif/1.0/aux/"
+    xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
+    xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/"
+    xmlns:stEvt="http://ns.adobe.com/xap/1.0/sType/ResourceEvent#"
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+    xmlns:lr="http://ns.adobe.com/lightroom/1.0/"
+   xmp:ModifyDate="2024-05-01T10:00:00+07:00"
+   xmp:Rating="2"
+   xmp:Label="Yellow"
+   tiff:Make="Canon"
+   aux:Lens="RF24-70mm F2.8 L IS USM"
+   crs:Version="16.0"
+   crs:ProcessVersion="15.4"
+   crs:WhiteBalance="As Shot"
+   crs:Exposure2012="+0.35"
+   crs:Contrast2012="+12"
+   crs:HasSettings="True">
+   <xmpMM:History>
+    <rdf:Seq>
+     <rdf:li stEvt:action="saved" stEvt:instanceID="xmp.iid:abc" stEvt:when="2024-05-01T10:00:00+07:00" stEvt:softwareAgent="Adobe Lightroom" stEvt:changed="/metadata"/>
+    </rdf:Seq>
+   </xmpMM:History>
+   <dc:subject>
+    <rdf:Bag>
+     <rdf:li>wedding</rdf:li>
+     <rdf:li>bride</rdf:li>
+    </rdf:Bag>
+   </dc:subject>
+   <dc:description><rdf:Alt><rdf:li xml:lang="x-default">A caption</rdf:li></rdf:Alt></dc:description>
+   <lr:hierarchicalSubject><rdf:Bag><rdf:li>people|bride</rdf:li></rdf:Bag></lr:hierarchicalSubject>
+   <crs:ToneCurvePV2012>
+    <rdf:Seq>
+     <rdf:li>0, 0</rdf:li>
+     <rdf:li>255, 255</rdf:li>
+    </rdf:Seq>
+   </crs:ToneCurvePV2012>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
