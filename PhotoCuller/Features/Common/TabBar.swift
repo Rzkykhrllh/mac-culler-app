@@ -134,14 +134,9 @@ struct PathBar: View {
                     }
                 }
             }
-            .layoutPriority(0)
-            .frame(minWidth: 60)
-            // The switch claims its width first (and picks a variant that fits); the path scrolls in the rest.
-            FileViewSwitcher(session: session)
-                .layoutPriority(1)
         }
         .padding(.horizontal, 12)
-        .frame(height: 34)
+        .frame(height: 30)
         .task(id: session.folder) {
             let folder = session.folder
             subfolders = await Task.detached(priority: .utility) {
@@ -173,18 +168,22 @@ struct PathBar: View {
     }
 }
 
-/// Always-visible RAW / JPEG mode switch (+ burst stacks, + RAW look when RAW files are shown on their own).
-/// Picks the widest variant that fits, so it never pushes the window content off-screen.
+/// The "what is shown" row right above the photos: Files (RAW / JPG mode) → Stacks → RAW look, always in that
+/// order and left-aligned. Picks the widest variant that fits, so it never pushes the window content off-screen.
 struct FileViewSwitcher: View {
     @Environment(AppModel.self) private var app
     let session: FolderSession
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            bar(compact: false)
-            bar(compact: true)
+            bar(compact: false, labels: true)
+            bar(compact: true, labels: true)
+            bar(compact: true, labels: false)
             menu
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
     }
 
     private var showsRawLook: Bool { session.fileView != .combined && session.fileView != .jpegOnly }
@@ -193,30 +192,47 @@ struct FileViewSwitcher: View {
     private var stackBinding: Binding<StackChoice> { Binding(get: { app.stackChoice }, set: { app.setStackChoice($0) }) }
     private var rawBinding: Binding<RawRendering> { Binding(get: { app.settings.rawRendering }, set: { app.setRawRendering($0) }) }
 
-    private func bar(compact: Bool) -> some View {
-        HStack(spacing: compact ? 6 : 8) {
-            ChoiceBar(options: FileViewMode.allCases.map {
-                .init(value: $0, title: $0.segmentTitle, help: Explain.fileView($0))
-            }, selection: modeBinding)
-
-            ChoiceBar(options: StackChoice.allCases.map {
-                .init(value: $0, title: $0.title, symbol: $0.symbol, help: Explain.stacks($0))
-            }, selection: stackBinding, compact: compact)
-
-            if app.stackChoice == .similar {
-                SimilarityControl()
+    private func bar(compact: Bool, labels: Bool) -> some View {
+        HStack(spacing: compact ? 10 : 14) {
+            group("Files", labels) {
+                ChoiceBar(options: FileViewMode.allCases.map {
+                    .init(value: $0, title: $0.segmentTitle, help: Explain.fileView($0))
+                }, selection: modeBinding)
             }
-
+            group("Stacks", labels) {
+                ChoiceBar(options: StackChoice.allCases.map {
+                    .init(value: $0, title: $0.title, symbol: $0.symbol, help: Explain.stacks($0))
+                }, selection: stackBinding, compact: compact)
+                if app.stackChoice == .similar {
+                    SimilarityControl()
+                }
+            }
             if showsRawLook {
-                ChoiceBar(options: RawRendering.allCases.reversed().map {
-                    .init(value: $0, title: $0 == .rendered ? "True RAW" : (compact ? "Camera" : "Camera Preview"), help: Explain.rawLook($0))
-                }, selection: rawBinding)
+                group("RAW look", labels) {
+                    ChoiceBar(options: RawRendering.allCases.reversed().map {
+                        .init(value: $0, title: $0 == .rendered ? "True RAW" : (compact ? "Camera" : "Camera Preview"), help: Explain.rawLook($0))
+                    }, selection: rawBinding)
+                }
             }
         }
-        .padding(.horizontal, 5)
+        .fixedSize()
+    }
+
+    /// A small caption followed by its control(s), in one glass capsule.
+    private func group<C: View>(_ title: String, _ label: Bool, @ViewBuilder _ content: () -> C) -> some View {
+        HStack(spacing: 6) {
+            if label {
+                Text(title.uppercased())
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 6)
+            }
+            content()
+        }
+        .padding(.horizontal, 4)
         .padding(.vertical, 3)
         .glassCapsule()
-        .fixedSize()
     }
 
     /// Narrowest variant: everything in one menu.

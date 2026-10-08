@@ -13,7 +13,9 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 TabBar()
                 if let s = app.session {
+                    // Top → bottom: where you are (tabs, path) → what is shown (files, stacks) → the photos.
                     PathBar(session: s)
+                    FileViewSwitcher(session: s)
                     SessionView(session: s)
                         .id(ObjectIdentifier(s))
                 } else if app.activeTab.pendingFolder != nil {
@@ -185,11 +187,6 @@ struct SessionToolbar: ToolbarContent {
                 }
                 .help("Some marks could not be written (e.g. read-only volume). They are kept and retried. Click to retry now (⇧⌘S).")
             }
-            if session.viewMode == .grid {
-                Slider(value: Binding(get: { session.settings.thumbnailSize }, set: { session.settings.thumbnailSize = $0 }), in: 90...480)
-                    .frame(width: 110)
-                    .help("Thumbnail size (⌘+ / ⌘−)")
-            }
             Menu {
                 Picker("Sort by", selection: $session.sort.key) {
                     ForEach(SortKey.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -263,6 +260,17 @@ struct StatusBar: View {
             }
             Chip(systemImage: "flag.fill", text: "\(picks)", tint: .white).help("Picks")
             Chip(systemImage: "xmark.circle.fill", text: "\(rejects)", tint: .red.opacity(0.9)).help("Rejects")
+            Divider().frame(height: 14)
+            // Thumbnail size lives with the photos it resizes (bottom right, like Finder and Photos).
+            HStack(spacing: 4) {
+                Image(systemName: "photo").font(.system(size: 9))
+                Slider(value: Binding(get: { session.settings.thumbnailSize }, set: { session.settings.thumbnailSize = $0 }), in: 90...480)
+                    .controlSize(.mini)
+                    .frame(width: compact ? 60 : 90)
+                Image(systemName: "photo").font(.system(size: 13))
+            }
+            .foregroundStyle(.secondary)
+            .help("Thumbnail size (⌘+ / ⌘−)")
         }
     }
 }

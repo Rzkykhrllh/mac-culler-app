@@ -121,6 +121,11 @@ enum DebugSelfTest {
         s.hud = nil
         try? await Task.sleep(for: .milliseconds(600))
         snap("grid")
+        w.setContentSize(NSSize(width: 900, height: 640))
+        try? await Task.sleep(for: .milliseconds(800))
+        snap("grid-small")
+        w.setContentSize(NSSize(width: 1300, height: 820))
+        try? await Task.sleep(for: .milliseconds(800))
         // Hover on the 3rd cell, pointer over the 4th star.
         func cells(_ v: NSView) -> [ThumbnailCellView] { (v as? ThumbnailCellView).map { [$0] } ?? v.subviews.flatMap(cells) }
         if let cell = cells(content).sorted(by: { $0.convert($0.bounds, to: nil).minX < $1.convert($1.bounds, to: nil).minX }).dropFirst(2).first(where: { $0.convert($0.bounds, to: nil).maxY > 300 }) {
