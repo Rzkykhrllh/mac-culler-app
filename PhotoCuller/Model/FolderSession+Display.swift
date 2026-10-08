@@ -5,7 +5,8 @@ extension FolderSession {
     /// Recomputes burst stacks from capture time + camera body (spec §4.4).
     func rebuildStacks() {
         let previousExpanded = expandedStacks.compactMap { stackMembers[$0] }
-        let inputs = items.values.map {
+        let mode = fileView
+        let inputs = items.values.filter { mode.shows($0.files) }.map {
             StackBuilder.Input(id: $0.id, captureDate: $0.exif?.captureDate, bodyKey: $0.exif?.bodyKey ?? "unknown")
         }
         let groups = StackBuilder.build(inputs, threshold: settings.burstThreshold)
@@ -28,8 +29,11 @@ extension FolderSession {
     func rebuildDisplay() {
         let f = filter
         let filterActive = f.isActive
+        let mode = fileView
         func matches(_ id: ItemID) -> Bool {
-            guard filterActive, let item = items[id] else { return true }
+            guard let item = items[id] else { return false }
+            guard mode.shows(item.files) else { return false }
+            guard filterActive else { return true }
             return f.matches(metadata: item.metadata, exif: item.exif, files: item.files)
         }
 
@@ -43,7 +47,7 @@ extension FolderSession {
         units.reserveCapacity(items.count)
         var seenStacks: Set<String> = []
         var matchCount = 0
-        for item in items.values {
+        for item in items.values where mode.shows(item.files) {
             if let sid = stackOf[item.id] {
                 guard seenStacks.insert(sid).inserted, let members = stackMembers[sid] else { continue }
                 let m = members.filter(matches)
@@ -124,6 +128,21 @@ extension FolderSession {
     func toggleCurrentStack() {
         guard let c = currentID, let sid = stackOf[c] else { return }
         toggleStack(sid)
+    }
+
+    /// S with several photos selected: if any selected stack is collapsed, expand them all; otherwise collapse them all.
+    func toggleSelectedStacks() {
+        var ids = selection
+        if let c = currentID { ids.insert(c) }
+        let sids = Set(ids.compactMap { stackOf[$0] })
+        guard !sids.isEmpty else { return }
+        let expand = sids.contains { !expandedStacks.contains($0) }
+        if expand { expandedStacks.formUnion(sids) } else { expandedStacks.subtract(sids) }
+        rebuildDisplay()
+        // Keep every member of a newly expanded stack selected so the next action applies to the whole block.
+        if expand, sids.count > 1 || selection.count > 1 {
+            selection = Set(sids.flatMap { visibleMembers(ofStack: $0) }).union(selection.filter { displayIndex[$0] != nil })
+        }
     }
 
     func expandAllStacks(_ expand: Bool) {

@@ -49,6 +49,8 @@ final class FolderSession {
     var selection: Set<ItemID> = []
     /// Direction of the last navigation step, used for prefetching (+1 / -1).
     @ObservationIgnored var lastDirection = 1
+    /// Fixed end of a ⇧-extended range selection.
+    @ObservationIgnored var selectionAnchor: ItemID?
 
     // UI state
     var showInfoPanel = false
@@ -79,7 +81,25 @@ final class FolderSession {
     }
 
     var settings: AppSettings { app.settings }
-    var scanOptions: ScanOptions { ScanOptions(includeSubfolders: includeSubfolders, pairRawWithRaster: settings.pairRawWithRaster) }
+    var scanOptions: ScanOptions { ScanOptions(includeSubfolders: includeSubfolders, pairRawWithRaster: fileView.pairs) }
+    var fileView: FileViewMode { settings.fileViewMode }
+
+    /// Switches the RAW/JPEG display mode, re-grouping files in place when pairing changes.
+    func setFileView(_ mode: FileViewMode) {
+        let old = settings.fileViewMode
+        guard mode != old else { return }
+        settings.fileViewMode = mode
+        if mode.pairs != old.pairs {
+            Task {
+                // Pending marks target the old grouping: write them first.
+                await app.writeQueue.flush()
+                await refresh()
+            }
+        } else {
+            rebuildStacks()
+            rebuildDisplay()
+        }
+    }
 
     var currentItem: PhotoItem? { currentID.flatMap { items[$0] } }
     var currentIndex: Int? { currentID.flatMap { displayIndex[$0] } }

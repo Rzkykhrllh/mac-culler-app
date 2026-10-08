@@ -19,7 +19,7 @@ struct NoteEditor: View {
                 .frame(width: 380, height: 110)
                 .scrollContentBackground(.hidden)
                 .padding(4)
-                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 10))
             HStack {
                 Text("Esc to cancel · ⌘↩ to save").font(.caption).foregroundStyle(.secondary)
                 Spacer()
@@ -30,9 +30,9 @@ struct NoteEditor: View {
                     .buttonStyle(.borderedProminent)
             }
         }
-        .padding(14)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .shadow(radius: 20)
+        .padding(16)
+        .glassCard(20)
+        .shadow(color: .black.opacity(0.4), radius: 30, y: 10)
         .onAppear {
             text = session.items[itemID]?.metadata.note ?? ""
             focused = true

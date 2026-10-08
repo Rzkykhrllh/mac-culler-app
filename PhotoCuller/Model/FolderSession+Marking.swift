@@ -147,8 +147,20 @@ extension FolderSession {
         if !extendSelection { selection = [id] }
     }
 
-    func move(_ offset: Int) {
-        if let n = neighbourID(offset: offset) { select(n) }
+    func move(_ offset: Int, extend: Bool = false) {
+        guard let n = neighbourID(offset: offset) ?? (offset > 0 ? display.last?.itemID : display.first?.itemID),
+              n != currentID else { return }
+        guard extend, let anchorID = selectionAnchor ?? currentID,
+              let a = displayIndex[anchorID], let b = displayIndex[n] else {
+            select(n)
+            selectionAnchor = n
+            return
+        }
+        // ⇧+arrow: select the range from the anchor to the new position.
+        currentID = n
+        lastDirection = offset > 0 ? 1 : -1
+        selection = Set(display[min(a, b)...max(a, b)].map(\.itemID))
+        selectionAnchor = anchorID
     }
 
     /// ⌥→ / ⌥←: next / previous unflagged item.

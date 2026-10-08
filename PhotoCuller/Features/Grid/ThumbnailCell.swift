@@ -78,6 +78,17 @@ final class ThumbnailCellView: NSView {
 
     override var isFlipped: Bool { true }
 
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        needsDisplay = true
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        var v: NSView? = superview
+        while let s = v, !(s is NSCollectionView) { v = s.superview }
+        return (v as? NSCollectionView)?.menu(for: event)
+    }
+
     /// Re-draws when the item's marks change (fine-grained Observation, no global reload).
     func observeItem() {
         guard let item else { return }
@@ -112,24 +123,32 @@ final class ThumbnailCellView: NSView {
         let b = bounds.insetBy(dx: compact ? 2 : 4, dy: compact ? 2 : 4)
         let meta = item?.metadata ?? .empty
 
-        // Stack members get a shared tinted background so a burst reads as a group.
-        var bg = NSColor(white: 0.17, alpha: 1)
-        if case .stackMember = entry?.kind { bg = NSColor(calibratedRed: 0.20, green: 0.22, blue: 0.27, alpha: 1) }
-        if isSelectedCell || isCurrent { bg = NSColor(white: 0.30, alpha: 1) }
-        let card = NSBezierPath(roundedRect: b, xRadius: 6, yRadius: 6)
+        // Card: soft translucent gradient; stack members get a cool tint so a burst reads as a group.
+        let radius: CGFloat = compact ? 7 : 10
+        let card = NSBezierPath(roundedRect: b, xRadius: radius, yRadius: radius)
         if entry?.isCollapsedStack == true {
             // Layered "pile" look for collapsed stacks.
-            NSColor(white: 0.24, alpha: 1).setFill()
-            NSBezierPath(roundedRect: b.offsetBy(dx: 3, dy: -3), xRadius: 6, yRadius: 6).fill()
+            NSColor(white: 1, alpha: 0.05).setFill()
+            NSBezierPath(roundedRect: b.offsetBy(dx: 4, dy: -4).insetBy(dx: 2, dy: 0), xRadius: radius, yRadius: radius).fill()
         }
-        bg.setFill()
-        card.fill()
+        var top = NSColor(white: 1, alpha: 0.075), bottom = NSColor(white: 1, alpha: 0.03)
+        if case .stackMember = entry?.kind {
+            top = NSColor(calibratedRed: 0.55, green: 0.6, blue: 1, alpha: 0.12)
+            bottom = NSColor(calibratedRed: 0.55, green: 0.6, blue: 1, alpha: 0.05)
+        }
+        if isSelectedCell || isCurrent {
+            top = NSColor(white: 1, alpha: 0.14)
+            bottom = NSColor(white: 1, alpha: 0.07)
+        }
+        NSGradient(starting: top, ending: bottom)?.draw(in: card, angle: -90)
 
         let inner = b.insetBy(dx: 6, dy: 6)
         let imageArea = NSRect(x: inner.minX, y: inner.minY, width: inner.width, height: inner.height - (compact ? 0 : 14))
         if let image {
             let r = aspectFit(CGSize(width: image.width, height: image.height), in: imageArea)
             ctx.saveGState()
+            ctx.addPath(CGPath(roundedRect: r, cornerWidth: compact ? 3 : 5, cornerHeight: compact ? 3 : 5, transform: nil))
+            ctx.clip()
             ctx.translateBy(x: 0, y: r.maxY + r.minY)
             ctx.scaleBy(x: 1, y: -1)
             ctx.interpolationQuality = .medium
@@ -147,14 +166,24 @@ final class ThumbnailCellView: NSView {
             NSBezierPath(roundedRect: NSRect(x: b.minX + 6, y: b.maxY - 5, width: b.width - 12, height: 3), xRadius: 1.5, yRadius: 1.5).fill()
         }
 
-        // Selection / current ring.
+        // Selection / current ring: warm gradient stroke.
         if isSelectedCell || isCurrent {
-            (isCurrent ? NSColor.controlAccentColor : NSColor.controlAccentColor.withAlphaComponent(0.6)).setStroke()
-            card.lineWidth = isCurrent ? 2.5 : 1.5
+            ctx.saveGState()
+            ctx.addPath(card.cgPath)
+            ctx.setLineWidth(isCurrent ? 3 : 2)
+            ctx.replacePathWithStrokedPath()
+            ctx.clip()
+            let alpha: CGFloat = isCurrent ? 1 : 0.65
+            NSGradient(starting: Theme.nsAccentStart.withAlphaComponent(alpha), ending: Theme.nsAccentEnd.withAlphaComponent(alpha))?
+                .draw(in: b, angle: -45)
+            ctx.restoreGState()
+        } else {
+            NSColor(white: 1, alpha: 0.06).setStroke()
+            card.lineWidth = 1
             card.stroke()
         }
         if let s = compareSlot {
-            drawBadge(["L", "R", "3", "4"][min(s, 3)], at: NSPoint(x: b.midX - 8, y: b.minY + 2), fill: .controlAccentColor)
+            drawBadge(["L", "R", "3", "4"][min(s, 3)], at: NSPoint(x: b.midX - 8, y: b.minY + 2), fill: Theme.nsAccentEnd)
         }
 
         // Flag badge (top-left).
@@ -195,7 +224,7 @@ final class ThumbnailCellView: NSView {
             }
             if let text {
                 let pt = NSPoint(x: inner.maxX, y: compact ? inner.maxY - 14 : b.maxY - 21)
-                stackBadgeRect = drawBadge(text, at: pt, alignRight: true, fill: entry.isCollapsedStack ? .controlAccentColor : NSColor(white: 0.4, alpha: 0.9))
+                stackBadgeRect = drawBadge(text, at: pt, alignRight: true, fill: entry.isCollapsedStack ? Theme.nsAccentEnd.withAlphaComponent(0.9) : NSColor(white: 0.35, alpha: 0.85))
                     .insetBy(dx: -4, dy: -4)
             }
         }
@@ -235,11 +264,11 @@ final class ThumbnailCellView: NSView {
     private func drawBadge(_ s: String, at p: NSPoint, alignRight: Bool = false, fill: NSColor) -> NSRect {
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .bold), .foregroundColor: NSColor.white]
         let size = (s as NSString).size(withAttributes: attrs)
-        var r = NSRect(x: p.x, y: p.y, width: size.width + 8, height: 14)
+        var r = NSRect(x: p.x, y: p.y, width: size.width + 10, height: 15)
         if alignRight { r.origin.x -= r.width }
         fill.setFill()
-        NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4).fill()
-        (s as NSString).draw(at: NSPoint(x: r.minX + 4, y: r.minY + (14 - size.height) / 2), withAttributes: attrs)
+        NSBezierPath(roundedRect: r, xRadius: 7.5, yRadius: 7.5).fill()
+        (s as NSString).draw(at: NSPoint(x: r.minX + 5, y: r.minY + (15 - size.height) / 2), withAttributes: attrs)
         return r
     }
 

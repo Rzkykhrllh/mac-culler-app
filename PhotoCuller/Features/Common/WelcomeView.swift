@@ -8,10 +8,14 @@ struct WelcomeView: View {
     var body: some View {
         VStack(spacing: 22) {
             Image(systemName: "camera.aperture")
-                .font(.system(size: 64, weight: .light))
-                .foregroundStyle(.tint)
+                .font(.system(size: 72, weight: .light))
+                .foregroundStyle(Theme.accent)
+                .padding(26)
+                .glass(in: Circle())
+                .shadow(color: Theme.accentEnd.opacity(0.35), radius: 40)
             VStack(spacing: 6) {
-                Text(AppConstants.appName).font(.largeTitle.bold())
+                Text(AppConstants.appName).font(.system(size: 40, weight: .bold, design: .rounded))
+                    .foregroundStyle(LinearGradient(colors: [.white, .white.opacity(0.7)], startPoint: .top, endPoint: .bottom))
                 Text("Open a folder, mark fast with the keyboard, keep the best frame of every burst.")
                     .foregroundStyle(.secondary)
             }
@@ -47,8 +51,8 @@ struct WelcomeView: View {
                     }
                 }
                 .frame(width: 420)
-                .padding()
-                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                .padding(16)
+                .glassCard(18)
             }
             Text("or drop a folder here").font(.caption).foregroundStyle(.tertiary)
         }
@@ -57,6 +61,7 @@ struct WelcomeView: View {
         .dropDestination(for: URL.self) { urls, _ in
             guard let url = urls.first, (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { return false }
             app.recentFolders.add(url)
+            app.sidebar.add(url)
             app.open(folder: url, securityScoped: false)
             return true
         } isTargeted: { dropTargeted = $0 }

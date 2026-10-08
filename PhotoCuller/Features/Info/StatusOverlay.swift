@@ -28,8 +28,9 @@ struct StatusOverlay: View {
                 Text(item.metadata.note).font(.caption).lineLimit(2).frame(maxWidth: 360, alignment: .leading)
             }
         }
-        .padding(8)
-        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .glassCard(14)
         .foregroundStyle(.white)
     }
 }

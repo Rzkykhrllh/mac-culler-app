@@ -9,16 +9,19 @@ struct CompareView: View {
     var body: some View {
         VStack(spacing: 0) {
             slotsGrid
-                .background(Color(white: 0.08))
+                .padding(6)
             if !session.isFullScreen {
                 CompareToolbar(session: session)
-                Divider()
+                    .padding(.horizontal, 10)
                 FilmstripView(session: session, entries: candidateEntries, revision: candidateRevision,
                               currentID: session.compare.activeItemID,
                               highlighted: Set(session.compare.slots.compactMap { $0 }),
                               compareSlots: session.compare.slots) { id in
                     session.putInActiveSlot(id)
                 }
+                .padding(4)
+                .glassCard(18)
+                .padding(10)
             }
         }
         .onAppear { syncLoaders() }
@@ -40,12 +43,12 @@ struct CompareView: View {
     @ViewBuilder private var slotsGrid: some View {
         let n = session.compare.slots.count
         if n <= 2 {
-            HStack(spacing: 2) { ForEach(0..<n, id: \.self) { slot($0) } }
+            HStack(spacing: 6) { ForEach(0..<n, id: \.self) { slot($0) } }
         } else {
             let rows = [Array(0..<2), Array(2..<n)]
-            VStack(spacing: 2) {
+            VStack(spacing: 6) {
                 ForEach(rows.indices, id: \.self) { r in
-                    HStack(spacing: 2) { ForEach(rows[r], id: \.self) { slot($0) } }
+                    HStack(spacing: 6) { ForEach(rows[r], id: \.self) { slot($0) } }
                 }
             }
         }
@@ -60,7 +63,8 @@ struct CompareView: View {
                 ZoomableImage(image: loader.image, pixelSize: loader.pixelSize, contentID: loader.itemID,
                               isFullResolution: loader.isFullResolution, slot: i, hub: session.viewports,
                               onActivate: { activate(i) },
-                              onZoomChange: { loader.setZoomed($0) })
+                              onZoomChange: { loader.setZoomed($0) },
+                              contextMenu: { PhotoContextMenu.make(session) })
                 if id == nil {
                     VStack(spacing: 6) {
                         Image(systemName: "photo.badge.plus").font(.largeTitle)
@@ -75,7 +79,7 @@ struct CompareView: View {
                         HStack {
                             if session.compare.pinBest && i == 0 {
                                 Label("Current best", systemImage: "pin.fill").font(.caption.bold())
-                                    .padding(5).background(.black.opacity(0.55), in: Capsule()).foregroundStyle(.white)
+                                    .padding(.horizontal, 10).padding(.vertical, 5).glassCapsule(tint: Theme.accentStart.opacity(0.35)).foregroundStyle(.white)
                             }
                             Spacer()
                         }
@@ -92,9 +96,11 @@ struct CompareView: View {
                     .allowsHitTesting(false)
                 }
             }
+            .background(Color.black.opacity(0.25))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 2)
-                    .strokeBorder(active ? Color.accentColor : Color.clear, lineWidth: 3)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(active ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.white.opacity(0.08)), lineWidth: active ? 3 : 1)
                     .allowsHitTesting(false)
             )
             .contentShape(Rectangle())
@@ -131,16 +137,17 @@ struct CompareToolbar: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 120)
-            Toggle("Sync zoom & pan", isOn: $session.compare.syncZoom)
+            Toggle("Sync zoom & pan  ⌥Z", isOn: $session.compare.syncZoom)
                 .help("Hold ⌥ while panning to move only the image under the pointer")
-            Toggle("Pin current best", isOn: $session.compare.pinBest)
+            Toggle("Pin current best  ⌥P", isOn: $session.compare.pinBest)
                 .help("Left slot holds the best; ←/→ cycles the right slot; Return promotes it")
             Spacer()
             Text("Tab: switch slot · ←/→: change photo in active slot · Z: 100%")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .toggleStyle(.checkbox)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .glassCard(16)
     }
 }

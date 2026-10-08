@@ -22,8 +22,13 @@ private struct GeneralSettings: View {
     var body: some View {
         @Bindable var s = app.settings
         Form {
-            Toggle("Treat RAW+JPEG as one photo", isOn: $s.pairRawWithRaster)
-                .onChange(of: s.pairRawWithRaster) { app.reopenCurrent() }
+            Picker("RAW+JPEG", selection: Binding(get: { s.fileViewMode }, set: { m in
+                if let session = app.session { session.setFileView(m) } else { s.fileViewMode = m }
+            })) {
+                ForEach(FileViewMode.allCases) { Text($0.title).tag($0) }
+            }
+            Text("“As One Photo” pairs files with the same name; marks apply to both. The other modes show each file on its own so RAW and JPEG can be marked separately.")
+                .font(.caption).foregroundStyle(.secondary)
             LabeledContent("Burst threshold") {
                 HStack {
                     Slider(value: $s.burstThreshold, in: 0.1...5, step: 0.1)
