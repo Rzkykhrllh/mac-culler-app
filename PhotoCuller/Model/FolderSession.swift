@@ -132,6 +132,8 @@ final class FolderSession {
             return
         }
         Log.session.info("Scanned \(folder.path, privacy: .public): \(files.count) items, \(exif.count) EXIF + \(meta.count) marks from index")
+        // Pay the one-time RAW engine start-up now, in the background, not when the first photo is shown.
+        if let raw = files.lazy.compactMap(\.raw).first { ImagePipeline.warmUpRaw(with: raw) }
         for f in files {
             let id = f.primary.path
             items[id] = PhotoItem(files: f, metadata: meta[id] ?? .empty, exif: exif[f.primary.path], metadataLoaded: meta[id] != nil)

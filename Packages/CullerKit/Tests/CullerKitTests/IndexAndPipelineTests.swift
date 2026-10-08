@@ -1,4 +1,5 @@
 import XCTest
+import ImageIO
 @testable import CullerKit
 
 final class IndexAndPipelineTests: XCTestCase {
@@ -94,4 +95,54 @@ final class IndexAndPipelineTests: XCTestCase {
             _ = StackBuilder.build(inputs, threshold: 1)
         }
     }
+}
+
+final class ProgressiveThumbnailTests: XCTestCase {
+    func testPairThumbnailComesFromRawEmbeddedPreview() throws {
+        let dir = try TestSupport.tempDir()
+        TestSupport.makeFakeRaw(dir.appendingPathComponent("A.RAF"))
+        TestSupport.makeImage(dir.appendingPathComponent("A.JPG"))
+        TestSupport.makeImage(dir.appendingPathComponent("B.JPG"))
+        let items = try TestSupport.items(dir)
+        let p = ImagePipeline(diskCache: nil)
+        p.rawRendering = .rendered
+        let pair = try XCTUnwrap(items.first { $0.isPair })
+        if !ImagePipeline.rawEngineReady {
+            XCTAssertEqual(p.thumbnailSource(for: pair).file.kind, .jpeg, "JPEG while the RAW engine is still cold")
+        }
+        ImagePipeline.warmUpRaw(with: try XCTUnwrap(pair.raw))
+        let deadline = Date().addingTimeInterval(20)
+        while !ImagePipeline.rawEngineReady && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
+        let src = p.thumbnailSource(for: pair)
+        XCTAssertEqual(src.file.kind, .raw, "RAW embedded preview once warm")
+        XCTAssertEqual(src.rendering, .embedded, "a pair keeps the camera look, never a slow True RAW render")
+        XCTAssertEqual(p.thumbnailKey(for: pair), p.renderKey(try XCTUnwrap(pair.raw)).replacingOccurrences(of: "#rendered", with: ""),
+                       "stable key regardless of which file produced the thumbnail")
+        let single = try XCTUnwrap(items.first { !$0.isPair })
+        XCTAssertEqual(p.thumbnailSource(for: single).file.fileName, "B.JPG")
+    }
+
+    func testJpegThumbnailIsProgressive() async throws {
+        let dir = try TestSupport.tempDir()
+        let url = dir.appendingPathComponent("A.jpg")
+        // JPEG with an embedded EXIF thumbnail, like camera files.
+        let d = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil)!
+        CGImageDestinationAddImage(d, TestSupport.gradient(width: 1200, height: 800),
+                                   [kCGImageDestinationEmbedThumbnail: true] as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(d))
+        let item = try XCTUnwrap(TestSupport.items(dir).first)
+        let p = ImagePipeline(diskCache: nil, thumbnailPixelSize: 400)
+        let partials = EventCounter()
+        let final = await p.thumbnail(for: item) { _ in partials.bump() }
+        XCTAssertEqual(final.map { max($0.width, $0.height) }, 400)
+        XCTAssertGreaterThanOrEqual(partials.value, 1, "the tiny embedded thumbnail is delivered first")
+        XCTAssertEqual(p.cachedThumbnail(for: item)?.isFinal, true)
+    }
+}
+
+final class EventCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var n = 0
+    func bump() { lock.withLock { n += 1 } }
+    var value: Int { lock.withLock { n } }
 }

@@ -89,6 +89,36 @@ Caps Lock auto-advance, `←`/`→`, `⌥←`/`⌥→` unflagged, `G`/`E`/`C` vi
 Every menu command has a shortcut; **Help ▸ Keyboard Shortcuts** (⌘/) lists them all. While typing in a text
 field, plain keys go straight to the field, so single-key shortcuts never fire by accident.
 
+## Performance (Apple M2, 820 RAF + 820 JPG, 54 GB)
+
+Measured with the read-only benchmark (`swift run -c release culler-bench <folder>` in `Packages/CullerKit`):
+
+| | |
+|---|---|
+| Scan 1,640 files → 820 items | 0.1 s |
+| EXIF + XMP index (first open; cached afterwards) | 0.7–1.4 s |
+| RAW+JPG grid: placeholders / first screen sharp / all 820 | 0.13 s / 1.4 s / 12 s |
+| RAW only, camera preview: first screen / all | 0.5 s / 11 s |
+| RAW only, True RAW: camera preview shown / first screen True RAW / all | 0.3 s / 11 s / ~3.5 min (background, disk-cached) |
+| Loupe preview 2560 px: JPG / RAW camera / True RAW | 170 / 175 / 300 ms (next 3 prefetched) |
+| 100% zoom: RAW / JPG | 50 / 330 ms |
+
+The first RAW a process touches costs ≈5 s (ImageIO RAW support) and the first Core Image RAW render ≈7 s;
+both are warmed up in the background as soon as a folder opens, and RAW+JPG thumbnails use the JPEG until then.
+Pairs take their thumbnail from the RAW's embedded preview (same camera look, ~6× faster than decoding a 26 MP JPEG),
+with the 1 ms embedded EXIF thumbnail shown first.
+
+Real-camera-file tests (copied to a temp folder, never modified in place):
+
+```bash
+CULLER_REAL_RAW_DIR=/path/to/copy/of/a/shoot swift test --filter RealCameraFileTests
+```
+
+Use a copy outside protected folders (Documents, Desktop…): the `xctest` helper has no permission to read them.
+
+Similar-photo grouping prototype (Vision feature prints): `swift run -c release culler-similar <folder>` —
+≈130 photos/s on an M2; it prints the groups found at several thresholds.
+
 ## Development aids (Debug builds only)
 
 ```bash

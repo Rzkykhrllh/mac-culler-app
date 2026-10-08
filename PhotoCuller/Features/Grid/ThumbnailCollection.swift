@@ -240,10 +240,10 @@ struct ThumbnailCollection: NSViewRepresentable {
             let pipeline = parent.session.app.pipeline
             for ip in ips where entries.indices.contains(ip.item) {
                 guard let item = parent.session.items[entries[ip.item].itemID] else { continue }
-                let f = item.files.primary
-                guard pipeline.cachedThumbnail(f) == nil else { continue }
+                let files = item.files
+                guard pipeline.cachedThumbnail(for: files)?.isFinal != true else { continue }
                 prefetchTasks[ip]?.cancel()
-                prefetchTasks[ip] = Task { _ = await pipeline.thumbnail(f, priority: .low) }
+                prefetchTasks[ip] = Task { _ = await pipeline.thumbnail(for: files, priority: .low) }
             }
         }
 

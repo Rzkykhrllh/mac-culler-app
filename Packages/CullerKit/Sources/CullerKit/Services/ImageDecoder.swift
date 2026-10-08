@@ -18,13 +18,14 @@ public enum ImageDecoder {
         CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary)
     }
 
-    private static func thumbnail(_ src: CGImageSource, maxPixel: Int, always: Bool) -> CGImage? {
-        let opts: [CFString: Any] = [
+    private static func thumbnail(_ src: CGImageSource, maxPixel: Int, always: Bool, extra: [CFString: Any] = [:]) -> CGImage? {
+        var opts: [CFString: Any] = [
             always ? kCGImageSourceCreateThumbnailFromImageAlways : kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixel,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
         ]
+        extra.forEach { opts[$0.key] = $0.value }
         return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
     }
 
@@ -42,7 +43,24 @@ public enum ImageDecoder {
             if let p = rawPreviewViaCoreImage(file.url, maxPixel: maxPixel, draft: true) { return p }
             return thumbnail(src, maxPixel: maxPixel, always: true)
         }
-        return thumbnail(src, maxPixel: maxPixel, always: true)
+        return thumbnail(src, maxPixel: maxPixel, always: true, extra: subsampleOptions(src, file: file, maxPixel: maxPixel))
+    }
+
+    /// The small thumbnail embedded in the file (no decode of the main image; ≈1 ms). nil if absent.
+    public static func embeddedThumbnail(for file: FileRef) -> CGImage? {
+        guard let src = source(file.url) else { return nil }
+        return thumbnail(src, maxPixel: 400, always: false)
+    }
+
+    /// JPEG / HEIC can decode directly at 1/2, 1/4 or 1/8 size; pick the largest factor that keeps ≥ maxPixel.
+    private static func subsampleOptions(_ src: CGImageSource, file: FileRef, maxPixel: Int) -> [CFString: Any] {
+        guard file.kind == .jpeg || file.kind == .heic,
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              let w = (props[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
+              let h = (props[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue else { return [:] }
+        let long = max(w, h)
+        for f in [8, 4, 2] where long / f >= maxPixel { return [kCGImageSourceSubsampleFactor: f] }
+        return [:]
     }
 
     /// Screen-sized preview. RAW: the embedded full-size JPEG preview; raster: downsampled decode.
@@ -59,7 +77,7 @@ public enum ImageDecoder {
             // Embedded preview missing or tiny: draft-mode RAW decode at reduced scale.
             return rawPreviewViaCoreImage(file.url, maxPixel: maxPixel, draft: true) ?? thumbnail(src, maxPixel: maxPixel, always: false)
         }
-        return thumbnail(src, maxPixel: maxPixel, always: true)
+        return thumbnail(src, maxPixel: maxPixel, always: true, extra: subsampleOptions(src, file: file, maxPixel: maxPixel))
     }
 
     /// Native-resolution image for 100% zoom. RAW via `CIRAWFilter`; raster decoded at native size with orientation.

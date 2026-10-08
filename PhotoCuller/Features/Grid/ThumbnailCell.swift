@@ -9,6 +9,7 @@ final class ThumbnailCell: NSCollectionViewItem {
     private var loadTask: Task<Void, Never>?
     private(set) var representedID: ItemID?
     private var representedKey: String?
+    private var hasFinalImage = false
 
     override func loadView() {
         view = ThumbnailCellView(frame: .zero)
@@ -24,6 +25,7 @@ final class ThumbnailCell: NSCollectionViewItem {
         loadTask = nil
         representedID = nil
         representedKey = nil
+        hasFinalImage = false
         cellView.item = nil
         cellView.image = nil
         cellView.isCurrent = false
@@ -32,7 +34,7 @@ final class ThumbnailCell: NSCollectionViewItem {
 
     func configure(entry: DisplayEntry, item: PhotoItem, pipeline: ImagePipeline, compact: Bool,
                    isCurrent: Bool, compareSlot: Int?) {
-        let key = pipeline.renderKey(item.files.primary)
+        let key = pipeline.thumbnailKey(for: item.files)
         let changed = representedID != item.id || representedKey != key
         representedID = item.id
         representedKey = key
@@ -42,22 +44,42 @@ final class ThumbnailCell: NSCollectionViewItem {
         cellView.isCurrent = isCurrent
         cellView.compareSlot = compareSlot
         cellView.observeItem()
-        guard changed || cellView.image == nil else { return }
-        let primary = item.files.primary
-        if let img = pipeline.cachedThumbnail(primary) {
-            cellView.image = img
-            return
+        guard changed || cellView.image == nil || !hasFinalImage else { return }
+        let files = item.files
+        if let c = pipeline.cachedThumbnail(for: files) {
+            cellView.image = c.image
+            hasFinalImage = c.isFinal
+            if c.isFinal { return }
+        } else {
+            cellView.image = nil
+            hasFinalImage = false
         }
-        cellView.image = nil
         loadTask?.cancel()
         let id = item.id
+        let weakCell = WeakCell(self)
         loadTask = Task { [weak self] in
-            let img = await pipeline.thumbnail(primary, priority: .high)
+            // Progressive: tiny embedded thumbnail / camera preview first, final image after.
+            let img = await pipeline.thumbnail(for: files, priority: .high) { partial in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        guard let cell = weakCell.value, cell.representedID == id, !cell.hasFinalImage else { return }
+                        cell.cellView.image = partial
+                    }
+                }
+            }
             guard let self, !Task.isCancelled, self.representedID == id else { return }
-            if img == nil { item.decodeFailed = true }
-            self.cellView.image = img
+            if img == nil && self.cellView.image == nil { item.decodeFailed = true }
+            if let img {
+                self.cellView.image = img
+                self.hasFinalImage = true
+            }
         }
     }
+}
+
+private final class WeakCell: @unchecked Sendable {
+    weak var value: ThumbnailCell?
+    init(_ c: ThumbnailCell) { value = c }
 }
 
 /// Drag & drop payload for photos (filmstrip → compare slot; also drops the file into Finder etc.).
