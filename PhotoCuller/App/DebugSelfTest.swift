@@ -5,6 +5,99 @@ import CullerKit
 /// DEBUG-only smoke test driven through the real session (launch with `-openFolder <dir> -selfTest`).
 /// Exercises marking → background write → undo, stacks, filters, compare and rename planning inside the sandbox.
 enum DebugSelfTest {
+    /// `-openFolder <dir> -expandTest`: expands stacks through real mouse events / S and reports where the pointer is.
+    static func runExpand(_ s: FolderSession) async {
+        while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        guard let w = KeyboardController.shared.mainWindow, let content = w.contentView else { return }
+        let saved = (s.settings.stackBursts, s.settings.groupingMode)
+        defer { s.settings.stackBursts = saved.0; s.settings.groupingMode = saved.1; s.regroup() }
+        s.settings.stackBursts = true; s.settings.groupingMode = .time; s.regroup()
+        s.expandAllStacks(false)
+        s.viewMode = .grid
+        w.setContentSize(NSSize(width: 1300, height: 820))
+        try? await Task.sleep(for: .seconds(2))
+        func name(_ id: ItemID?) -> String { id.map { ($0 as NSString).lastPathComponent } ?? "nil" }
+        func cells(_ v: NSView) -> [ThumbnailCellView] { (v as? ThumbnailCellView).map { [$0] } ?? v.subviews.flatMap(cells) }
+        func collection(_ v: NSView) -> NSCollectionView? { (v as? NSCollectionView) ?? v.subviews.lazy.compactMap(collection).first }
+        func report(_ label: String, stack sid: String) {
+            let members = s.stackMembers[sid] ?? []
+            let cv = collection(content)
+            let cvSel = cv?.selectionIndexPaths.map { s.display.indices.contains($0.item) ? name(s.display[$0.item].itemID) : "?" } ?? []
+            let ringed = cells(content).filter(\.isCurrent).compactMap { $0.item?.id }.map(name)
+            Log.session.info("EXPANDTEST \(label, privacy: .public): current=\(name(s.currentID), privacy: .public) inStack=\(members.contains(s.currentID ?? ""), privacy: .public) selection=\(s.selection.map(name).sorted(), privacy: .public) cvSelection=\(cvSel, privacy: .public) ring=\(ringed, privacy: .public) members=\(members.map(name), privacy: .public)")
+        }
+        // Pick a collapsed stack that is NOT the first entry, select something else first.
+        guard let entryIndex = s.display.indices.dropFirst(2).first(where: { s.display[$0].isCollapsedStack }),
+              let sid = s.display[entryIndex].stackID else { Log.session.info("EXPANDTEST no stack"); return }
+        s.select(s.display[0].itemID)
+        try? await Task.sleep(for: .milliseconds(500))
+        // Real double-click on that stack's cell.
+        let coverID = s.display[entryIndex].itemID
+        guard let cell = cells(content).first(where: { $0.item?.id == coverID }) else { Log.session.info("EXPANDTEST cell not visible"); return }
+        let r = cell.convert(cell.bounds, to: nil)
+        let p = NSPoint(x: r.midX, y: r.midY)
+        for clicks in 1...2 {
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                              windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1) {
+                    w.sendEvent(e)
+                }
+            }
+        }
+        try? await Task.sleep(for: .milliseconds(800))
+        report("after double-click", stack: sid)
+        // Collapse again with S, then expand with S from the cover.
+        _ = s.perform(KeyMap.Match(action: .toggleStack, advance: false))
+        try? await Task.sleep(for: .milliseconds(600))
+        report("after S (collapse)", stack: sid)
+        _ = s.perform(KeyMap.Match(action: .toggleStack, advance: false))
+        try? await Task.sleep(for: .milliseconds(600))
+        report("after S (expand)", stack: sid)
+        func expectFirst(_ what: String) {
+            let first = s.visibleMembers(ofStack: sid).first
+            let ok = s.currentID == first && s.selection.contains(first ?? "")
+            Log.session.info("EXPANDTEST \(ok ? "ok  " : "FAIL", privacy: .public) \(what, privacy: .public): pointer \(name(s.currentID), privacy: .public), first frame \(name(first), privacy: .public)")
+        }
+        expectFirst("S expands → pointer on first frame")
+        // Badge click with the pointer on another photo.
+        s.expandAllStacks(false)
+        s.select(s.display[0].itemID)
+        s.toggleStack(sid)
+        try? await Task.sleep(for: .milliseconds(400))
+        expectFirst("badge expands while pointer elsewhere → pointer moves into the stack")
+        s.toggleStack(sid)
+        let cover = s.display.first { $0.stackID == sid }?.itemID
+        Log.session.info("EXPANDTEST \(s.currentID == cover ? "ok  " : "FAIL", privacy: .public) collapse → pointer on cover")
+
+        // Scenario 2: a pick in the middle becomes the cover; expand from the cover.
+        let members = s.stackMembers[sid] ?? []
+        if members.count >= 3 {
+            s.apply(.flag(.pick), toItem: members[2])
+            s.expandAllStacks(false)
+            try? await Task.sleep(for: .milliseconds(500))
+            let cover = s.display.first { $0.stackID == sid }?.itemID
+            Log.session.info("EXPANDTEST cover after pick: \(name(cover), privacy: .public)")
+            if let cover { s.select(cover) }
+            try? await Task.sleep(for: .milliseconds(400))
+            _ = s.perform(KeyMap.Match(action: .toggleStack, advance: false))
+            try? await Task.sleep(for: .milliseconds(600))
+            report("pick-cover, after S (expand)", stack: sid)
+            expectFirst("pick cover: expand → pointer on first frame")
+            // Scenario 3: same in the loupe (filmstrip).
+            s.expandAllStacks(false)
+            if let cover { s.select(cover) }
+            s.viewMode = .loupe
+            try? await Task.sleep(for: .milliseconds(800))
+            _ = s.perform(KeyMap.Match(action: .toggleStack, advance: false))
+            try? await Task.sleep(for: .milliseconds(800))
+            report("loupe, after S (expand)", stack: sid)
+            expectFirst("loupe: expand → pointer on first frame")
+            s.viewMode = .grid
+            s.apply(.flag(.none), toItem: members[2])
+        }
+        Log.session.info("EXPANDTEST done")
+    }
+
     /// `-openFolder <dir> -uiSnapshots`: renders key UI states to Documents/Snapshots for review.
     static func runSnapshots(_ s: FolderSession) async {
         while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
