@@ -9,11 +9,20 @@ struct StatusOverlay: View {
     var showsPosition = true
 
     var body: some View {
+        // Narrow slots (compare with 3–4 photos) drop the details instead of wrapping over the photo.
+        ViewThatFits(in: .horizontal) {
+            card(detail: 2)
+            card(detail: 1)
+            card(detail: 0)
+        }
+    }
+
+    private func card(detail: Int) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             MarksView(metadata: item.metadata, writeState: item.writeState)
-            if !minimal {
+            if !minimal, detail >= 1 {
                 HStack(spacing: 10) {
-                    Text(item.fileName).fontWeight(.semibold)
+                    Text(item.fileName).fontWeight(.semibold).lineLimit(1)
                     Text(kindBadge).font(.caption2.weight(.semibold)).padding(.horizontal, 5).padding(.vertical, 1)
                         .background(.white.opacity(0.15), in: Capsule())
                     if showsPosition, let i = session.currentIndex, item.id == session.currentID {
@@ -21,11 +30,13 @@ struct StatusOverlay: View {
                     }
                 }
                 .font(.caption)
+                .fixedSize()
             }
-            if let e = item.exif {
+            if detail >= 2, let e = item.exif {
                 Text(ExifFormat.summary(e)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    .lineLimit(1).fixedSize()
             }
-            if item.metadata.hasNote, !minimal {
+            if detail >= 2, item.metadata.hasNote, !minimal {
                 Text(item.metadata.note).font(.caption).lineLimit(2).frame(maxWidth: 360, alignment: .leading)
             }
         }
@@ -33,6 +44,7 @@ struct StatusOverlay: View {
         .padding(.vertical, 9)
         .glassCard(14)
         .foregroundStyle(.white)
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 

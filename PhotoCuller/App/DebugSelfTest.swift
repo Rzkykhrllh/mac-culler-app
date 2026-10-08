@@ -12,6 +12,9 @@ enum DebugSelfTest {
             if !ok { failures.append(what) }
         }
         while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        let userStacking = s.settings.stackBursts
+        if !userStacking { s.app.setStackBursts(true) }
+        defer { if !userStacking { s.app.setStackBursts(false) } }
 
         let sizes = s.stackMembers.values.map(\.count).sorted()
         check(!sizes.isEmpty, "stacks built: \(sizes)")
@@ -168,6 +171,47 @@ enum DebugSelfTest {
         }
         if let main = NSApp.mainMenu { walk(main, "") }
         check(dupes.isEmpty, "no duplicate menu shortcuts \(dupes) (\(seen.count) shortcuts)")
+
+        // Layout at different window widths: nothing may stick out past the window, the minimum size holds.
+        if let w = KeyboardController.shared.mainWindow, let content = w.contentView {
+            let snapDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Snapshots")
+            try? FileManager.default.createDirectory(at: snapDir, withIntermediateDirectories: true)
+            s.showInfoPanel = true
+            s.showFilterBar = true
+            for (mode, width) in [(ViewMode.grid, 900.0), (.grid, 1000), (.loupe, 900), (.compare, 900), (.grid, 1400)] {
+                if mode == .compare { s.enterCompare() } else { s.viewMode = mode }
+                w.setContentSize(NSSize(width: width, height: 640))
+                try? await Task.sleep(for: .milliseconds(700))
+                content.layoutSubtreeIfNeeded()
+                let bounds = content.bounds
+                var overflow: [String] = []
+                func walk(_ v: NSView) {
+                    if v is NSClipView { return }   // scrolled content may extend beyond by design
+                    for sub in v.subviews where !sub.isHidden && sub.frame.width > 1 {
+                        let f = sub.convert(sub.bounds, to: content)
+                        if f.maxX > bounds.maxX + 2 || f.minX < bounds.minX - 2 { overflow.append("\(type(of: sub)) \(Int(f.minX))…\(Int(f.maxX))") }
+                        walk(sub)
+                    }
+                }
+                func findSplit(_ v: NSView) -> NSView? { v is NSSplitView ? v : v.subviews.lazy.compactMap(findSplit).first }
+                if let split = findSplit(content) {
+                    let f = split.convert(split.bounds, to: content)
+                    if f.maxX > bounds.maxX + 2 || f.minX < bounds.minX - 2 { overflow.append("split view \(Int(f.minX))…\(Int(f.maxX))") }
+                }
+                check(overflow.isEmpty, "layout \(mode.rawValue) @\(Int(width))pt: nothing outside the window \(overflow.prefix(4))")
+                if let rep = content.bitmapImageRepForCachingDisplay(in: bounds) {
+                    content.cacheDisplay(in: bounds, to: rep)
+                    try? rep.representation(using: .png, properties: [:])?.write(to: snapDir.appendingPathComponent("\(mode.rawValue)-\(Int(width)).png"))
+                }
+            }
+            w.setContentSize(NSSize(width: 500, height: 400))
+            try? await Task.sleep(for: .milliseconds(300))
+            check(w.contentLayoutRect.width >= 899, "window can't shrink below its minimum (\(Int(w.contentLayoutRect.width))pt)")
+            s.showInfoPanel = false
+            s.showFilterBar = false
+            s.viewMode = .grid
+            w.setContentSize(NSSize(width: 1300, height: 820))
+        }
 
         let st = s.app.pipeline.stats
         Log.session.info("SELFTEST stats thumbs=\(st.thumbRequests) gen=\(st.thumbGenerated) previews=\(st.previewRequests) lastPreviewMs=\(st.lastPreviewMs)")

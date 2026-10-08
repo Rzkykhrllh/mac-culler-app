@@ -8,18 +8,57 @@ struct FilterBar: View {
     @State private var showExif = false
 
     var body: some View {
+        // One row when it fits, otherwise marks + status on the first row and the rest on a second row.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                marks
+                Divider().frame(height: 18)
+                types
+                Spacer(minLength: 12)
+                status
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    marks
+                    Spacer(minLength: 8)
+                    status
+                }
+                HStack(spacing: 12) {
+                    types
+                    Spacer(minLength: 0)
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) { flagsAndRating; Spacer(minLength: 0) }
+                HStack(spacing: 10) { labels; Spacer(minLength: 8); status }
+                HStack(spacing: 10) { types; Spacer(minLength: 0) }
+            }
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 7)
+        .glassCard(16)
+    }
+
+    @ViewBuilder private var marks: some View {
+        HStack(spacing: 12) {
+            flagsAndRating
+            Divider().frame(height: 18)
+            labels
+        }
+        .fixedSize()
+    }
+
+    @ViewBuilder private var flagsAndRating: some View {
         HStack(spacing: 12) {
             Image(systemName: "line.3.horizontal.decrease.circle").foregroundStyle(.secondary)
-
             HStack(spacing: 2) {
                 flagToggle(.pick, "flag.fill", "Picks")
                 flagToggle(.reject, "xmark.circle.fill", "Rejects")
                 flagToggle(.none, "flag.slash", "Unflagged")
             }
             .focused($focused)
-
             Divider().frame(height: 18)
-
             Picker("", selection: $session.filter.ratingOperator) {
                 ForEach(FilterState.RatingOperator.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
@@ -31,15 +70,19 @@ struct FilterBar: View {
             }
             .labelsHidden()
             .frame(width: 90)
+        }
+        .fixedSize()
+    }
 
-            Divider().frame(height: 18)
+    @ViewBuilder private var labels: some View {
+        HStack(spacing: 4) {
+            ForEach(ColorLabel.allCases, id: \.self) { l in labelToggle(l) }
+        }
+        .fixedSize()
+    }
 
-            HStack(spacing: 4) {
-                ForEach(ColorLabel.allCases, id: \.self) { l in labelToggle(l) }
-            }
-
-            Divider().frame(height: 18)
-
+    @ViewBuilder private var types: some View {
+        HStack(spacing: 12) {
             Menu {
                 ForEach(FilterState.FileTypeFilter.allCases, id: \.self) { t in
                     Toggle(t.rawValue, isOn: setBinding(\.fileTypes, t))
@@ -48,24 +91,25 @@ struct FilterBar: View {
                 Text(session.filter.fileTypes.isEmpty ? "All types" : session.filter.fileTypes.map(\.rawValue).sorted().joined(separator: ", "))
             }
             .fixedSize()
-
             Toggle(isOn: $session.filter.hasNote) { Image(systemName: "text.bubble") }
                 .toggleStyle(.button)
                 .help("Has note")
-
             Button {
                 showExif.toggle()
             } label: {
                 Label("EXIF", systemImage: session.filter.usesExif ? "camera.fill" : "camera")
             }
             .popover(isPresented: $showExif, arrowEdge: .bottom) { ExifFilterPopover(session: session) }
+        }
+        .fixedSize()
+    }
 
-            Spacer()
-
+    @ViewBuilder private var status: some View {
+        HStack(spacing: 8) {
             if let p = session.indexing {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total)))
-                    .frame(width: 80)
-                Text("Indexing \(p.done)/\(p.total)").font(.caption).foregroundStyle(.secondary)
+                    .frame(width: 60)
+                Text("\(p.done)/\(p.total)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
             Text("\(session.matchingCount) of \(session.items.count)")
                 .font(.caption.monospacedDigit())
@@ -74,10 +118,7 @@ struct FilterBar: View {
                 Button("Clear") { session.filter = FilterState() }
             }
         }
-        .controlSize(.small)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .glassCard(16)
+        .fixedSize()
     }
 
     private func flagToggle(_ f: Flag, _ symbol: String, _ help: String) -> some View {

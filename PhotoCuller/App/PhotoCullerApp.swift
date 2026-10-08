@@ -28,6 +28,9 @@ struct PhotoCullerApp: App {
                     #endif
                 }
         }
+        // Enforce the content's minimum size so the window can never be smaller than its layout.
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 1400, height: 900)
         .commands { AppCommands(app: app) }
 
         Window("Operation History", id: "history") {

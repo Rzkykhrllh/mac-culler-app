@@ -151,34 +151,68 @@ struct CompareToolbar: View {
     @Bindable var session: FolderSession
 
     var body: some View {
-        HStack(spacing: 14) {
-            Picker("Slots", selection: Binding(get: { session.compare.slots.count },
-                                               set: { session.compare.setSlotCount($0) })) {
-                Text("2").tag(2)
-                Text("3").tag(3)
-                Text("4").tag(4)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 14) { controls(compact: false); Spacer(minLength: 8); hint }
+            HStack(spacing: 14) { controls(compact: false); Spacer(minLength: 0) }
+            HStack(spacing: 10) { controls(compact: true); Spacer(minLength: 0) }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) { slotPicker; stripPicker(compact: true); Spacer(minLength: 0) }
+                HStack(spacing: 10) { toggles(compact: true); Spacer(minLength: 0) }
             }
-            .pickerStyle(.segmented)
-            .frame(width: 120)
-            Toggle("Sync zoom & pan  ⌥Z", isOn: $session.compare.syncZoom)
-                .help("Hold ⌥ while panning to move only the image under the pointer")
-            Toggle("Pin current best  ⌥P", isOn: $session.compare.pinBest)
-                .help("Left slot holds the best; ←/→ cycles the right slot; Return promotes it")
-            Picker("Filmstrip", selection: Binding(get: { session.compare.stripShowsAll }, set: { session.setCompareStripShowsAll($0) })) {
-                Text(session.compare.baseCandidates.count > 1 ? "Candidates (\(session.compare.baseCandidates.count))" : "Candidates").tag(false)
-                Text("All Photos").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .fixedSize()
-            .help("What the filmstrip shows (⌥A)")
-            Spacer()
-            Text("Drag from the filmstrip onto a slot · Tab: switch slot · ←/→: change photo · Z: 100%")
-                .font(.caption).foregroundStyle(.secondary)
-                .lineLimit(1)
         }
         .toggleStyle(.checkbox)
+        .controlSize(.small)
         .padding(.horizontal, 14)
         .padding(.vertical, 7)
         .glassCard(16)
+    }
+
+    private func controls(compact: Bool) -> some View {
+        HStack(spacing: compact ? 10 : 14) {
+            slotPicker
+            toggles(compact: compact)
+            stripPicker(compact: compact)
+        }
+        .fixedSize()
+    }
+
+    private var slotPicker: some View {
+        Picker("Slots", selection: Binding(get: { session.compare.slots.count },
+                                           set: { session.compare.setSlotCount($0) })) {
+            Text("2").tag(2)
+            Text("3").tag(3)
+            Text("4").tag(4)
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+        .help("Number of slots (⌥2 / ⌥3 / ⌥4)")
+    }
+
+    private func toggles(compact: Bool) -> some View {
+        HStack(spacing: compact ? 8 : 14) {
+            Toggle(compact ? "Sync" : "Sync zoom & pan  ⌥Z", isOn: $session.compare.syncZoom)
+                .help("Hold ⌥ while panning to move only the image under the pointer (⌥Z)")
+            Toggle(compact ? "Pin best" : "Pin current best  ⌥P", isOn: $session.compare.pinBest)
+                .help("Left slot holds the best; ←/→ cycles the right slot; Return promotes it (⌥P)")
+        }
+        .fixedSize()
+    }
+
+    private func stripPicker(compact: Bool) -> some View {
+        Picker("", selection: Binding(get: { session.compare.stripShowsAll }, set: { session.setCompareStripShowsAll($0) })) {
+            Text(compact ? "Candidates" : (session.compare.baseCandidates.count > 1 ? "Candidates (\(session.compare.baseCandidates.count))" : "Candidates")).tag(false)
+            Text(compact ? "All" : "All Photos").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .help("What the filmstrip shows (⌥A)")
+    }
+
+    private var hint: some View {
+        Text("Drag from the filmstrip onto a slot · Tab: switch slot · ←/→: change photo · Z: 100%")
+            .font(.caption).foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize()
     }
 }
