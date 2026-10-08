@@ -149,6 +149,14 @@ enum DebugSelfTest {
         try? await Task.sleep(for: .seconds(2))
         snap("loupe")
         s.viewMode = .grid
+        // Pairs without stacks: the RAW card behind each JPG.
+        let stacksBefore = s.settings.stackBursts
+        s.settings.stackBursts = false
+        s.regroup()
+        try? await Task.sleep(for: .seconds(2))
+        snap("pairs")
+        s.settings.stackBursts = stacksBefore
+        s.regroup()
         // Separate mode: hover a JPG, its RAW gets the dashed outline.
         let savedMode = s.fileView
         let savedStacks = s.settings.stackBursts
@@ -329,6 +337,73 @@ enum DebugSelfTest {
         while s.similarityTask != nil { try? await Task.sleep(for: .milliseconds(20)) }
         check(s.featurePrints.count == visible, "reopen: prints from cache in \(Int(Date().timeIntervalSince(t2) * 1000)) ms")
         Log.session.info("SIMTEST \(failures.isEmpty ? "PASS" : "FAILED: \(failures)", privacy: .public)")
+    }
+
+    /// Move to Trash + undo/redo. Run on a throwaway folder: phase 1 uses a fake Trash (a temp folder),
+    /// phase 2 the real system Trash for one test file, then undoes it.
+    static func runTrash(_ s: FolderSession) async {
+        func check(_ ok: Bool, _ what: String) {
+            Log.session.info("TRASHTEST \(ok ? "ok  " : "FAIL", privacy: .public) \(what, privacy: .public)")
+        }
+        func exists(_ urls: [URL]) -> Bool { urls.allSatisfy { FileManager.default.fileExists(atPath: $0.path) } }
+        func gone(_ urls: [URL]) -> Bool { urls.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) } }
+        func waitFor(_ cond: () -> Bool) async { for _ in 0..<50 where !cond() { try? await Task.sleep(for: .milliseconds(100)) } }
+        while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        let log = s.app.operationLog
+        let savedTrasher = log.trasher
+        defer { log.trasher = savedTrasher }
+
+        let bin = FileManager.default.temporaryDirectory.appendingPathComponent("FakeTrash-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        log.trasher = { url in
+            let dest = bin.appendingPathComponent(UUID().uuidString + "-" + url.lastPathComponent)
+            try FileManager.default.moveItem(at: url, to: dest)
+            return dest
+        }
+        let total = s.items.count
+        guard let item = s.items[s.display[0].itemID] else { return check(false, "has items") }
+        let urls = item.files.allURLs
+        check(urls.count >= 2, "first photo has \(urls.count) files (pair)")
+        await s.trash([item])
+        check(gone(urls), "all files of the photo left the folder")
+        check(s.items[item.id] == nil && s.items.count == total - 1, "photo removed from the grid (\(s.items.count)/\(total))")
+        check(s.currentID != nil && s.currentID != item.id, "pointer moved to a neighbour")
+        check(log.all.last?.kind == .trash, "recorded in Operation History")
+        s.undo()
+        check(exists(urls), "⌘Z put every file back")
+        await waitFor { s.items[item.id] != nil }
+        check(s.items[item.id] != nil, "photo back in the grid after undo")
+        s.redo()
+        check(gone(urls), "⇧⌘Z trashed it again")
+        s.undo()
+        check(exists(urls), "undo again restores it")
+        await waitFor { s.items[item.id] != nil }
+
+        // Rejects: mark two photos rejected, trash only those.
+        let two = s.display.prefix(3).dropFirst().compactMap { s.items[$0.itemID] }
+        for p in two { s.select(p.id); s.apply(.flag(.reject)) }
+        let rejects = s.items.values.filter { $0.metadata.flag == .reject }
+        check(rejects.count == two.count, "\(rejects.count) rejects marked")
+        await s.trash(rejects)
+        check(rejects.allSatisfy { s.items[$0.id] == nil } && s.items.count == total - two.count, "only rejects trashed")
+        s.undo()
+        check(rejects.allSatisfy { exists($0.files.allURLs) }, "rejects restored")
+        await waitFor { s.items.count == total }
+
+        // Real system Trash, one photo; undo must bring it back out of the Trash.
+        log.trasher = savedTrasher
+        if let last = s.items[s.display.last!.itemID] {
+            let lurls = last.files.allURLs
+            await s.trash([last])
+            let where_ = log.all.last?.entries.map(\.to).joined(separator: ", ") ?? "?"
+            check(gone(lurls), "system Trash took the files → \(where_)")
+            s.undo()
+            check(exists(lurls), "undo from the system Trash restored the files")
+        }
+        await waitFor { s.items.count == total }
+        check(s.items.count == total, "folder back to \(total) photos")
+        try? FileManager.default.removeItem(at: bin)
+        Log.session.info("TRASHTEST done")
     }
 
     static func run(_ s: FolderSession) async {

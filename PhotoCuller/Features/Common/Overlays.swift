@@ -50,7 +50,7 @@ struct ShortcutSheet: View {
         ("Focus", "scope", [("F", "Focus peaking"), ("J", "Clipping"), ("Y", "Zoom to eyes / face / animal"), ("B", "Sharpest in stack")]),
         ("Stacks & compare", "square.stack", [("S", "Expand / collapse"), ("⇧S / ⌥S", "Stacks on/off · Bursts ↔ Similar"), ("⌥[ / ⌥]", "Similarity stricter · looser"),
                                               ("Tab", "Next compare slot"), ("⌥Z / ⌥P", "Sync zoom · Pin best"), ("⌥2 – ⌥4", "Number of slots")]),
-        ("Files & tabs", "folder", [("F2", "Rename"), ("⇧⌘M / ⇧⌘C", "Move · Copy"), ("⌘Z / ⇧⌘Z", "Undo · Redo"), ("⌘T / ⌘W", "New · Close tab"),
+        ("Files & tabs", "folder", [("F2", "Rename"), ("⇧⌘M / ⇧⌘C", "Move · Copy"), ("⌘⌫ / ⇧⌘⌫", "Trash photo · all rejects"), ("⌘Z / ⇧⌘Z", "Undo · Redo"), ("⌘T / ⌘W", "New · Close tab"),
                                     ("⌘1 – 9", "Go to tab"), ("⌘↑ / ⌥⌘↓", "Enclosing · Next folder")]),
     ]
 

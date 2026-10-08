@@ -99,6 +99,8 @@ enum PhotoContextMenu {
         menu.addItem(ActionMenuItem("Copy…", key: "c", modifiers: [.command, .shift]) { s.activeSheet = .copy })
 
         menu.addItem(.separator())
+        menu.addItem(ActionMenuItem(targets.count > 1 ? "Move \(targets.count) Photos to Trash…" : "Move to Trash…",
+                                    key: String(UnicodeScalar(NSBackspaceCharacter)!), modifiers: [.command]) { s.trashSelection() })
         menu.addItem(ActionMenuItem("Reveal in Finder", key: "r", modifiers: [.command, .shift]) {
             NSWorkspace.shared.activateFileViewerSelecting(targets.flatMap(\.files.allURLs))
         })

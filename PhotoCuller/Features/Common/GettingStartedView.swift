@@ -16,7 +16,7 @@ struct GettingStartedView: View {
     private var pages: [Page] {
         [
             Page(symbol: "camera.aperture", title: "Welcome to \(AppConstants.appName)",
-                 text: "A fast way to go through a shoot: look at every photo, mark the keepers, compare bursts, and move or rename the result. Your marks are saved into the photo files (XMP), so Lightroom sees ratings and color labels too. Nothing is ever deleted automatically.",
+                 text: "A fast way to go through a shoot: look at every photo, mark the keepers, compare bursts, and move or rename the result. Your marks are saved into the photo files (XMP), so Lightroom sees ratings and color labels too. Nothing is deleted unless you ask: ⌘⌫ (or ⇧⌘⌫ for all rejects) moves photos to the Trash, and ⌘Z brings them back.",
                  visual: AnyView(MarkRow())),
             Page(symbol: "sidebar.left", title: "Folders and tabs",
                  text: "The sidebar works like Finder. Locked folders need permission once: click one and choose Grant Access — granting your home folder unlocks everything below it. Each tab (⌘T) keeps its own folder, selection and view; ⌘-click a folder to open it in a new tab.",
