@@ -96,6 +96,8 @@ struct ShortcutsHelpView: View {
                 row("Undo / Redo", "⌘Z / ⇧⌘Z")
                 row("Full screen", "⌃⌘F")
                 row("Independent pan in compare", "hold ⌥ while panning")
+                row("Put a photo in a compare slot", "drag it from the filmstrip onto the slot")
+                row("Show / hide filmstrip", "⌥⌘B")
                 row("Context menu", "right-click a photo")
             }
         }

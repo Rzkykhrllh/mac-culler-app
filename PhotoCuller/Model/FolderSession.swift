@@ -56,6 +56,8 @@ final class FolderSession {
     var showInfoPanel = false
     var showHistogram = false
     var showFilterBar = false
+    /// Filmstrip under loupe / compare (stays visible in full screen unless hidden with ⌥⌘B).
+    var showFilmstrip = true
     var editingNote: ItemID?
     var isFullScreen = false
     var compare = CompareState()

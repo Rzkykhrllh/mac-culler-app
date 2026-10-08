@@ -5,12 +5,14 @@ import CullerKit
 struct CompareView: View {
     @Bindable var session: FolderSession
     @State private var loaders: [SlotImageLoader] = []
+    /// Slot currently under a filmstrip drag.
+    @State private var dropTarget: Int?
 
     var body: some View {
         VStack(spacing: 0) {
             slotsGrid
                 .padding(6)
-            if !session.isFullScreen {
+            if session.showFilmstrip {
                 CompareToolbar(session: session)
                     .padding(.horizontal, 10)
                 FilmstripView(session: session, entries: candidateEntries, revision: candidateRevision,
@@ -64,11 +66,15 @@ struct CompareView: View {
                               isFullResolution: loader.isFullResolution, slot: i, hub: session.viewports,
                               onActivate: { activate(i) },
                               onZoomChange: { loader.setZoomed($0) },
-                              contextMenu: { PhotoContextMenu.make(session) })
+                              contextMenu: { PhotoContextMenu.make(session) },
+                              onDropItem: { session.put($0, inSlot: i) },
+                              onDragHover: { over in
+                                  if over { dropTarget = i } else if dropTarget == i { dropTarget = nil }
+                              })
                 if id == nil {
                     VStack(spacing: 6) {
                         Image(systemName: "photo.badge.plus").font(.largeTitle)
-                        Text(active ? "Click a photo in the filmstrip" : "Empty slot").font(.callout)
+                        Text(active ? "Click or drag a photo from the filmstrip" : "Drag a photo here").font(.callout)
                     }
                     .foregroundStyle(.secondary)
                     .allowsHitTesting(false)
@@ -96,11 +102,25 @@ struct CompareView: View {
                     .allowsHitTesting(false)
                 }
             }
+            .overlay {
+                if dropTarget == i {
+                    ZStack {
+                        Theme.accent.opacity(0.18)
+                        Label(i == 0 ? "Drop to show on the left" : (i == 1 ? "Drop to show on the right" : "Drop to show in slot \(i + 1)"),
+                              systemImage: "square.and.arrow.down")
+                            .font(.headline)
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .glassCapsule()
+                    }
+                    .allowsHitTesting(false)
+                }
+            }
             .background(Color.black.opacity(0.25))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(active ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.white.opacity(0.08)), lineWidth: active ? 3 : 1)
+                    .strokeBorder(active || dropTarget == i ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(Color.white.opacity(0.08)),
+                                  style: StrokeStyle(lineWidth: active || dropTarget == i ? 3 : 1, dash: dropTarget == i ? [8, 5] : []))
                     .allowsHitTesting(false)
             )
             .contentShape(Rectangle())
@@ -141,9 +161,17 @@ struct CompareToolbar: View {
                 .help("Hold ⌥ while panning to move only the image under the pointer")
             Toggle("Pin current best  ⌥P", isOn: $session.compare.pinBest)
                 .help("Left slot holds the best; ←/→ cycles the right slot; Return promotes it")
+            Picker("Filmstrip", selection: Binding(get: { session.compare.stripShowsAll }, set: { session.setCompareStripShowsAll($0) })) {
+                Text(session.compare.baseCandidates.count > 1 ? "Candidates (\(session.compare.baseCandidates.count))" : "Candidates").tag(false)
+                Text("All Photos").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .fixedSize()
+            .help("What the filmstrip shows (⌥A)")
             Spacer()
-            Text("Tab: switch slot · ←/→: change photo in active slot · Z: 100%")
+            Text("Drag from the filmstrip onto a slot · Tab: switch slot · ←/→: change photo · Z: 100%")
                 .font(.caption).foregroundStyle(.secondary)
+                .lineLimit(1)
         }
         .toggleStyle(.checkbox)
         .padding(.horizontal, 14)

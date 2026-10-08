@@ -56,7 +56,28 @@ final class ThumbnailCell: NSCollectionViewItem {
     }
 }
 
-final class ThumbnailCellView: NSView {
+/// Drag & drop payload for photos (filmstrip → compare slot; also drops the file into Finder etc.).
+enum DragPayload {
+    static let prefix = "photoculler-item:"
+
+    static func pasteboardItem(for item: PhotoItem) -> NSPasteboardItem {
+        let pb = NSPasteboardItem()
+        pb.setString(prefix + item.id, forType: .string)
+        pb.setString(item.files.primary.url.absoluteString, forType: .fileURL)
+        return pb
+    }
+
+    static func itemID(from pasteboard: NSPasteboard) -> ItemID? {
+        guard let s = pasteboard.string(forType: .string), s.hasPrefix(prefix) else { return nil }
+        return String(s.dropFirst(prefix.count))
+    }
+}
+
+final class ThumbnailCellView: NSView, NSDraggingSource {
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        .copy
+    }
+
     var entry: DisplayEntry? { didSet { needsDisplay = true } }
     var item: PhotoItem?
     var image: CGImage? { didSet { needsDisplay = true } }
@@ -66,7 +87,12 @@ final class ThumbnailCellView: NSView {
     var compact = false
     var onDoubleClick: (() -> Void)?
     var onStackBadge: (() -> Void)?
+    /// Filmstrips handle clicks themselves (click = pick on mouse-up) so a drag never changes the active slot.
+    var manualClicks = false
+    var onClick: (() -> Void)?
     private var stackBadgeRect: NSRect = .zero
+    private var downPoint: NSPoint?
+    private var dragStarted = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -112,8 +138,41 @@ final class ThumbnailCellView: NSView {
             onStackBadge?()
             return
         }
+        if manualClicks {
+            downPoint = event.locationInWindow
+            dragStarted = false
+            if event.clickCount == 2 { onDoubleClick?() }
+            return
+        }
         super.mouseDown(with: event)
         if event.clickCount == 2 { onDoubleClick?() }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard manualClicks, let start = downPoint, !dragStarted else {
+            if !manualClicks { super.mouseDragged(with: event) }
+            return
+        }
+        let p = event.locationInWindow
+        guard hypot(p.x - start.x, p.y - start.y) >= 4, let item else { return }
+        dragStarted = true
+        let dragItem = NSDraggingItem(pasteboardWriter: DragPayload.pasteboardItem(for: item))
+        dragItem.setDraggingFrame(bounds, contents: dragImage())
+        beginDraggingSession(with: [dragItem], event: event, source: self)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer { downPoint = nil }
+        guard manualClicks else { super.mouseUp(with: event); return }
+        if downPoint != nil, !dragStarted { onClick?() }
+    }
+
+    private func dragImage() -> NSImage {
+        guard let rep = bitmapImageRepForCachingDisplay(in: bounds) else { return NSImage(size: bounds.size) }
+        cacheDisplay(in: bounds, to: rep)
+        let img = NSImage(size: bounds.size)
+        img.addRepresentation(rep)
+        return img
     }
 
     // MARK: Drawing

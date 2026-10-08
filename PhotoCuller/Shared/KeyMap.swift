@@ -18,6 +18,7 @@ enum KeyAction: Equatable {
     case escape
     case toggleSyncZoom
     case togglePinBest
+    case toggleStripShowsAll
 }
 
 struct KeyBinding {
@@ -76,6 +77,7 @@ enum KeyMap {
             .init(key: .character("s"), action: .toggleStack, title: "Expand / collapse selected stacks"),
             .init(key: .character("z"), option: true, action: .toggleSyncZoom, title: "Compare: sync zoom & pan"),
             .init(key: .character("p"), option: true, action: .togglePinBest, title: "Compare: pin current best"),
+            .init(key: .character("a"), option: true, action: .toggleStripShowsAll, title: "Compare: filmstrip shows all photos / candidates"),
             .init(key: .character("g"), action: .showGrid, title: "Grid"),
             .init(key: .character("e"), action: .showLoupe, title: "Loupe"),
             .init(key: .character("c"), action: .showCompare, title: "Compare"),

@@ -16,7 +16,8 @@ struct LoupeView: View {
                 ZoomableImage(image: loader.image, pixelSize: loader.pixelSize, contentID: loader.itemID,
                               isFullResolution: loader.isFullResolution, slot: 0, hub: session.viewports,
                               onZoomChange: { loader.setZoomed($0) },
-                              contextMenu: { PhotoContextMenu.make(session) })
+                              contextMenu: { PhotoContextMenu.make(session) },
+                              onDropItem: { session.select($0) })
                 ImageStateOverlay(loader: loader)
                 if let item = session.currentItem {
                     VStack {
@@ -32,7 +33,7 @@ struct LoupeView: View {
                     }
                 }
             }
-            if !session.isFullScreen {
+            if session.showFilmstrip {
                 FilmstripView(session: session, entries: session.display, revision: session.displayRevision,
                               currentID: session.currentID, highlighted: Set([session.currentID].compactMap { $0 })) { id in
                     session.select(id)

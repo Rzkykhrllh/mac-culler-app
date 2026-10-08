@@ -154,6 +154,9 @@ final class ZoomScrollView: NSScrollView {
     var onActivate: (() -> Void)?
     var onZoomChange: ((Bool) -> Void)?
     var contextMenuProvider: (() -> NSMenu?)?
+    /// A photo dragged from a filmstrip was dropped here.
+    var onDropItem: ((ItemID) -> Void)?
+    var onDragHover: ((Bool) -> Void)?
     private(set) var isFit = true
     private var reporting = true
     private(set) var pixelSize: CGSize = .zero
@@ -174,6 +177,28 @@ final class ZoomScrollView: NSScrollView {
         verticalScrollElasticity = .none
         contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(boundsChanged), name: NSView.boundsDidChangeNotification, object: contentView)
+        registerForDraggedTypes([.string])
+    }
+
+    // MARK: Drop target (filmstrip → slot)
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard onDropItem != nil, DragPayload.itemID(from: sender.draggingPasteboard) != nil else { return [] }
+        onDragHover?(true)
+        return .copy
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        onDropItem != nil && DragPayload.itemID(from: sender.draggingPasteboard) != nil ? .copy : []
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) { onDragHover?(false) }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        onDragHover?(false)
+        guard let id = DragPayload.itemID(from: sender.draggingPasteboard), let onDropItem else { return false }
+        onDropItem(id)
+        return true
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -332,6 +357,8 @@ struct ZoomableImage: NSViewRepresentable {
     var onActivate: () -> Void = {}
     var onZoomChange: (Bool) -> Void = { _ in }
     var contextMenu: () -> NSMenu? = { nil }
+    var onDropItem: ((ItemID) -> Void)?
+    var onDragHover: (Bool) -> Void = { _ in }
 
     final class Coordinator {
         var contentID: String?
@@ -350,6 +377,8 @@ struct ZoomableImage: NSViewRepresentable {
         v.onActivate = onActivate
         v.onZoomChange = onZoomChange
         v.contextMenuProvider = contextMenu
+        v.onDropItem = onDropItem
+        v.onDragHover = onDragHover
         if hub.view(slot: slot) !== v { hub.register(v, slot: slot) }
         let c = context.coordinator
         if c.contentID != contentID {

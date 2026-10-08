@@ -100,8 +100,12 @@ struct SessionView: View {
             }
         }
         .onChange(of: session.showFilterBar) { if session.showFilterBar { filterFocused = true } }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in session.isFullScreen = true }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in session.isFullScreen = false }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { n in
+            if (n.object as? NSWindow) === KeyboardController.shared.mainWindow { session.isFullScreen = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { n in
+            if (n.object as? NSWindow) === KeyboardController.shared.mainWindow { session.isFullScreen = false }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .focusFilterBar)) { _ in
             session.showFilterBar = true
             filterFocused = true
