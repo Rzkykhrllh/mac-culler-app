@@ -27,6 +27,26 @@ final class XMPTests: XCTestCase {
         XCTAssertEqual(cleared, foreignBefore)
     }
 
+    /// Regression: clearing every owned field leaves an empty packet ImageIO cannot parse; the next write must still work.
+    func testSidecarRoundTripThroughEmpty() throws {
+        let dir = try TestSupport.tempDir()
+        let url = dir.appendingPathComponent("A.xmp")
+        try XMPCodec.writeSidecar(PhotoMetadata(rating: 3), to: url)
+        try XMPCodec.writeSidecar(.empty, to: url)
+        XCTAssertTrue(XMPCodec.isEmptyPacket(try Data(contentsOf: url)))
+        try XMPCodec.writeSidecar(PhotoMetadata(flag: .pick), to: url)
+        XCTAssertEqual(XMPCodec.readSidecar(url)?.resolved, PhotoMetadata(flag: .pick))
+    }
+
+    func testUnparseableSidecarIsNeverOverwritten() throws {
+        let dir = try TestSupport.tempDir()
+        let url = dir.appendingPathComponent("B.xmp")
+        let junk = Data("<x:xmpmeta><rdf:RDF><rdf:Description crs:Exposure=\"1\"/></rdf:RDF>".utf8)  // malformed, has content
+        try junk.write(to: url)
+        XCTAssertThrowsError(try XMPCodec.writeSidecar(PhotoMetadata(rating: 1), to: url))
+        XCTAssertEqual(try Data(contentsOf: url), junk)
+    }
+
     func testReadsLightroomRatingAndLabel() throws {
         let p = XMPCodec.readSidecar(TestSupport.fixture("lightroom-sidecar.xmp"))
         XCTAssertEqual(p?.rating, 2)
