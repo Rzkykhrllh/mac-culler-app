@@ -23,6 +23,8 @@ final class AppSettings {
         didSet { defaults.set(try? JSONEncoder().encode(renamePresets), forKey: Keys.presets) }
     }
     var showDebugOverlay: Bool { didSet { defaults.set(showDebugOverlay, forKey: Keys.debug) } }
+    /// RAW look: neutral render from sensor data (default) or the camera's embedded JPEG (film simulation, faster).
+    var rawRendering: RawRendering { didSet { defaults.set(rawRendering.rawValue, forKey: Keys.rawRendering) } }
 
     var cacheLimitBytes: Int64 { Int64(cacheLimitGB * 1_000_000_000) }
 
@@ -40,6 +42,7 @@ final class AppSettings {
         static let thumbSize = "thumbnailSize"
         static let presets = "renamePresets"
         static let debug = "showDebugOverlay"
+        static let rawRendering = "rawRendering"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -61,6 +64,7 @@ final class AppSettings {
         cacheLimitGB = defaults.double(forKey: Keys.cacheLimit)
         thumbnailSize = defaults.double(forKey: Keys.thumbSize)
         showDebugOverlay = defaults.bool(forKey: Keys.debug)
+        rawRendering = defaults.string(forKey: Keys.rawRendering).flatMap(RawRendering.init(rawValue:)) ?? .rendered
         if let d = defaults.data(forKey: Keys.presets), let p = try? JSONDecoder().decode([RenamePreset].self, from: d) {
             renamePresets = p
         } else {
@@ -82,6 +86,15 @@ enum FileViewMode: String, CaseIterable, Identifiable {
         case .both: return "RAW and JPEG Separately"
         case .jpegOnly: return "JPEG Only"
         case .rawOnly: return "RAW Only"
+        }
+    }
+
+    var segmentTitle: String {
+        switch self {
+        case .combined: return "RAW+JPG"
+        case .both: return "Separate"
+        case .jpegOnly: return "JPG"
+        case .rawOnly: return "RAW"
         }
     }
 

@@ -62,15 +62,24 @@ Packages/CullerKit/          Core library, fully unit-tested (`swift test`)
   empty values instead), and ImageIO cannot parse an XMP packet with no properties (written by hand
   and recognized with an XML parser).
 
-## Folders, RAW+JPEG modes, selection
+## Folders, tabs, RAW+JPEG modes, selection
 
-- **Sidebar tree**: add a parent folder once (⌘O / ⇧⌘O / drop it on the window). Every subfolder can then be
-  opened with one click; the root's security-scoped bookmark keeps sandbox access. ⌘↑ / ⌥⌘↓ / ⌥⌘↑ move between folders.
-- **RAW + JPEG** (⌥⌘1–4): *as one photo* (marks apply to both files), *separately*, *JPEG only*, *RAW only*.
-  The separate modes treat each file as its own photo so RAW and JPEG can be marked differently
-  (when switching back to "one photo", the RAW sidecar's values win).
+- **Finder-like sidebar**: Favorites (Home, Desktop, Documents, Downloads, Pictures), pinned folders and
+  Locations (internal / external / SD-card volumes). Every folder expands lazily with a photo count.
+  The sandbox only lets the app read what you granted: a locked folder asks once (“Grant Access”, opened
+  right at that folder) and the security-scoped bookmark is kept, so everything below it is browsable from then on.
+  A path bar above the photos shows where you are and the subfolders of the current folder.
+- **Tabs** like a web browser (⌘T, ⌘W, ⇧⌘T, ⌃Tab, ⌘1–9, ⌘-click a folder): each tab keeps its own folder,
+  selection, filters, view mode and compare state; tabs are restored on the next launch.
+- **RAW + JPEG** (segmented control above the photos, ⌥⌘1–4): *as one photo* (marks apply to both files),
+  *separately*, *JPEG only*, *RAW only*. In the separate modes each file is its own photo.
+- **True RAW vs camera preview** (⌥⌘R): RAW files are rendered from the sensor data with Core Image by default,
+  so they look different from the camera JPEG (no film simulation). “Camera Preview” uses the JPEG embedded in
+  the RAW instead (faster, camera look). In “as one photo” mode the pair shows the JPEG, also at 100%.
 - **Selection**: ⇧/⌘-click, drag, ⇧+arrows. `S` expands/collapses every selected stack. Marks apply to the whole selection.
 - **Right-click** any photo (grid, filmstrip, loupe, compare) for all photo actions, with their shortcuts shown.
+- **Compare**: drag photos from the filmstrip onto the left / right slot; ⌥A switches the filmstrip between the
+  candidates and all photos.
 
 ## Keyboard
 

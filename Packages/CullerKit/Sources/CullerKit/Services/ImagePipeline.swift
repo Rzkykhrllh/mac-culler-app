@@ -35,6 +35,19 @@ public final class ImagePipeline: @unchecked Sendable {
     private let fullLoads: LoadQueue
     public let diskCache: ThumbnailDiskCache?
 
+    private let renderingLock = NSLock()
+    private var _rawRendering: RawRendering = .rendered
+    /// How RAW thumbnails / previews are produced. Part of every cache key, so switching is instant for cached images.
+    public var rawRendering: RawRendering {
+        get { renderingLock.withLock { _rawRendering } }
+        set { renderingLock.withLock { _rawRendering = newValue } }
+    }
+
+    /// Cache key of a file's derived images under the current RAW rendering.
+    public func renderKey(_ file: FileRef) -> String {
+        file.kind.isRaw && rawRendering == .rendered ? file.cacheKey + "#rendered" : file.cacheKey
+    }
+
     private let statsLock = NSLock()
     private var _stats = Stats()
     public var stats: Stats { statsLock.withLock { _stats } }
@@ -55,13 +68,14 @@ public final class ImagePipeline: @unchecked Sendable {
     // MARK: Thumbnails
 
     public func cachedThumbnail(_ file: FileRef) -> CGImage? {
-        thumbMemory.object(forKey: file.cacheKey as NSString)?.image
+        thumbMemory.object(forKey: renderKey(file) as NSString)?.image
     }
 
     /// Loads a thumbnail: memory → disk cache → generated. `priority` lets visible cells jump the queue.
     public func thumbnail(_ file: FileRef, priority: Operation.QueuePriority = .normal) async -> CGImage? {
         record { $0.thumbRequests += 1 }
-        let key = file.cacheKey
+        let key = renderKey(file)
+        let raw = rawRendering
         if let img = thumbMemory.object(forKey: key as NSString)?.image {
             record { $0.thumbMemoryHits += 1 }
             return img
@@ -73,7 +87,7 @@ public final class ImagePipeline: @unchecked Sendable {
                 self.record { $0.thumbDiskHits += 1 }
                 return d
             }
-            guard let t = ImageDecoder.thumbnail(for: file, maxPixel: px) else {
+            guard let t = ImageDecoder.thumbnail(for: file, maxPixel: px, raw: raw) else {
                 self.record { $0.failures += 1 }
                 return nil
             }
@@ -85,11 +99,11 @@ public final class ImagePipeline: @unchecked Sendable {
         return img
     }
 
-    public func cancelThumbnail(_ file: FileRef) { thumbLoads.cancel(key: file.cacheKey) }
+    public func cancelThumbnail(_ file: FileRef) { thumbLoads.cancel(key: renderKey(file)) }
 
     // MARK: Screen previews
 
-    private func previewKey(_ file: FileRef, _ maxPixel: Int) -> String { "\(file.cacheKey)#\(maxPixel)" }
+    private func previewKey(_ file: FileRef, _ maxPixel: Int) -> String { "\(renderKey(file))#\(maxPixel)" }
 
     public func cachedPreview(_ file: FileRef, maxPixel: Int) -> CGImage? {
         previewMemory.object(forKey: previewKey(file, maxPixel) as NSString)?.image
@@ -102,9 +116,10 @@ public final class ImagePipeline: @unchecked Sendable {
             record { $0.previewHits += 1 }
             return img
         }
+        let raw = rawRendering
         let img = await previewLoads.load(key: key, priority: priority) { [weak self] in
             let t0 = DispatchTime.now()
-            let img = ImageDecoder.preview(for: file, maxPixel: maxPixel)
+            let img = ImageDecoder.preview(for: file, maxPixel: maxPixel, raw: raw)
             let ms = Double(DispatchTime.now().uptimeNanoseconds - t0.uptimeNanoseconds) / 1e6
             self?.record { s in
                 s.previewDecodes += 1

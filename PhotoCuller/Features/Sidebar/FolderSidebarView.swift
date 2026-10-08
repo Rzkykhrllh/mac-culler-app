@@ -1,55 +1,36 @@
 import SwiftUI
 import CullerKit
 
-/// Folder tree: click any folder or subfolder to open it (no Open dialog needed once a root is added).
+/// Finder-like folder browser: Favorites, pinned folders and Locations; every folder expands lazily.
+/// Click opens in the current tab, ⌘-click (or the context menu) in a new tab.
 struct FolderSidebarView: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
         let sidebar = app.sidebar
-        List(selection: Binding(get: { sidebar.selectedURL }, set: { url in
-            guard let url else { return }
-            sidebar.selectedURL = url
-            app.openFromSidebar(url)
-        })) {
+        List(selection: Binding(get: { sidebar.selectedURL }, set: { _ in })) {
+            if !sidebar.pinned.isEmpty {
+                Section("Pinned") {
+                    ForEach(sidebar.pinned) { FolderRow(node: $0, isRoot: true) }
+                }
+            }
+            Section("Favorites") {
+                ForEach(sidebar.favorites) { FolderRow(node: $0, isRoot: true) }
+            }
             Section {
-                if sidebar.roots.isEmpty {
-                    Button {
-                        app.showOpenPanel()
-                    } label: {
-                        Label("Add a folder…", systemImage: "plus.circle")
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                }
-                ForEach(sidebar.roots) { root in
-                    FolderRow(node: root, isRoot: true)
-                }
+                ForEach(sidebar.locations) { FolderRow(node: $0, isRoot: true) }
             } header: {
                 HStack {
-                    Text("Folders")
+                    Text("Locations")
                     Spacer()
                     Button { app.showOpenPanel() } label: { Image(systemName: "plus") }
                         .buttonStyle(.borderless)
-                        .help("Add Folder to Sidebar… (⇧⌘O)")
-                }
-            }
-
-            let recents = app.recentFolders.entries.filter { sidebar.root(containing: URL(fileURLWithPath: $0.path)) == nil }.prefix(5)
-            if !recents.isEmpty {
-                Section("Recent") {
-                    ForEach(Array(recents)) { e in
-                        Label(e.name, systemImage: "clock")
-                            .lineLimit(1)
-                            .contentShape(Rectangle())
-                            .onTapGesture { app.open(recent: e) }
-                            .help(e.path)
-                    }
+                        .help("Open / grant access to another folder… (⇧⌘O)")
                 }
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 400)
+        .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 420)
     }
 }
 
@@ -61,7 +42,13 @@ private struct FolderRow: View {
     var body: some View {
         Group {
             if node.hasChildren {
-                DisclosureGroup(isExpanded: Binding(get: { node.isExpanded }, set: { node.isExpanded = $0 })) {
+                DisclosureGroup(isExpanded: Binding(get: { node.isExpanded }, set: { expand in
+                    if expand && node.needsAccess {
+                        Task { await app.sidebar.requestAccess(node) }
+                    } else {
+                        node.isExpanded = expand
+                    }
+                })) {
                     ForEach(node.children ?? []) { FolderRow(node: $0) }
                 } label: {
                     label
@@ -77,13 +64,17 @@ private struct FolderRow: View {
     }
 
     private var label: some View {
-        let isOpen = app.session?.folder.standardizedFileURL == node.url
+        let isOpen = app.sidebar.selectedURL == node.url
         return HStack(spacing: 6) {
-            Image(systemName: isRoot ? "externaldrive.fill" : (isOpen ? "folder.fill" : "folder"))
+            Image(systemName: isOpen && node.symbol == "folder" ? "folder.fill" : node.symbol)
                 .foregroundStyle(isOpen ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
+                .frame(width: 18)
             Text(node.name).lineLimit(1)
             Spacer(minLength: 4)
-            if let n = node.photoCount, n > 0 {
+            if node.needsAccess {
+                Image(systemName: "lock.fill").font(.caption2).foregroundStyle(.tertiary)
+                    .help("Click to give \(AppConstants.appName) access to this folder (once)")
+            } else if let n = node.photoCount, n > 0 {
                 Text("\(n)")
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -93,16 +84,32 @@ private struct FolderRow: View {
             }
         }
         .tag(node.url)
+        .contentShape(Rectangle())
+        .onTapGesture { open(newTab: NSEvent.modifierFlags.contains(.command)) }
         .help(node.url.path)
         .contextMenu {
-            Button("Open") { app.openFromSidebar(node.url) }
-            Button("Open with Subfolders") { app.open(folder: node.url, securityScoped: false, includeSubfolders: true) }
+            Button("Open") { open(newTab: false) }
+            Button("Open in New Tab") { open(newTab: true) }
+            Button("Open with Subfolders") {
+                if app.sidebar.ensureAccess(node.url) { app.open(folder: node.url, includeSubfolders: true) }
+            }
+            Divider()
+            if app.sidebar.isPinned(node.url) {
+                Button("Unpin") { app.sidebar.unpin(node) }
+            } else {
+                Button("Pin to Sidebar") { app.sidebar.pin(node.url) }
+            }
             Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([node.url]) }
             Button("Refresh") { Task { await node.load(force: true) } }
-            if isRoot {
-                Divider()
-                Button("Remove from Sidebar") { app.sidebar.remove(node) }
+        }
+    }
+
+    private func open(newTab: Bool) {
+        Task {
+            if node.needsAccess {
+                guard await app.sidebar.requestAccess(node) else { return }
             }
+            app.openFromSidebar(node.url, newTab: newTab)
         }
     }
 }
