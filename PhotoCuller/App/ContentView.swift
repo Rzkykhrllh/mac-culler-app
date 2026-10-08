@@ -89,6 +89,17 @@ struct SessionView: View {
                         case .compare: CompareView(session: session)
                         }
                     }
+                    if let hud = session.hud {
+                        MarkHUDView(hud: hud)
+                            .id(hud.id)
+                            .transition(.scale(scale: 0.85).combined(with: .opacity))
+                            .allowsHitTesting(false)
+                    }
+                    if session.showShortcuts {
+                        Color.black.opacity(0.3).ignoresSafeArea().onTapGesture { session.showShortcuts = false }
+                        ShortcutSheet { session.showShortcuts = false }
+                            .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                    }
                     if let id = session.editingNote {
                         Color.black.opacity(0.25).ignoresSafeArea().onTapGesture { session.editingNote = nil }
                         NoteEditor(session: session, itemID: id)
@@ -127,6 +138,8 @@ struct SessionView: View {
             }
         }
         .animation(.smooth(duration: 0.2), value: session.showFilterBar)
+        .animation(.spring(duration: 0.22, bounce: 0.3), value: session.hud)
+        .animation(.smooth(duration: 0.18), value: session.showShortcuts)
         .toolbar { SessionToolbar(session: session) }
         .sheet(item: $session.activeSheet) { sheet in
             switch sheet {

@@ -48,6 +48,7 @@
 		D2DC1BF0287B20FE1823C267 /* KeyboardController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4EFCBB5268DE4F42969DBB /* KeyboardController.swift */; };
 		D2F51378364132568295A139 /* DebugSelfTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3120515515B65BCEB961B6C1 /* DebugSelfTest.swift */; };
 		D30184AD636B5E5246EA1F51 /* NoteEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22CC38286D12E7C5A42F9698 /* NoteEditor.swift */; };
+		E2FA9178E712E7F8E63A0CF4 /* Overlays.swift in Sources */ = {isa = PBXBuildFile; fileRef = D90DA14AE288F7791502A938 /* Overlays.swift */; };
 		E60743E421B874FE4FBD6AFD /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EBD348744CAC14B7528F2A8 /* AppSettings.swift */; };
 		F16AD2AA00668E26CB775DB2 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FC127B82166FA8F74B129E /* AppModel.swift */; };
 		FFDE614A85B1C4A0F7F41293 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = F716C156361A0B0B0DBD78B1 /* AppCommands.swift */; };
@@ -94,6 +95,7 @@
 		C1B135980E9FA2A2B9E3C1EA /* PhotoCuller.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhotoCuller.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CF1CB06B042E883374E875E7 /* FolderSession+Display.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FolderSession+Display.swift"; sourceTree = "<group>"; };
 		D0465FF44B707A61CE518A4D /* PhotoCullerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCullerApp.swift; sourceTree = "<group>"; };
+		D90DA14AE288F7791502A938 /* Overlays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Overlays.swift; sourceTree = "<group>"; };
 		D988A255A80C2CBF86D40950 /* FolderSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderSidebarView.swift; sourceTree = "<group>"; };
 		E4AACD975334B92BF7B9A2B9 /* CullerKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CullerKit; path = Packages/CullerKit; sourceTree = SOURCE_ROOT; };
 		E8DB1177F0330325CFFCA700 /* RenameSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenameSheet.swift; sourceTree = "<group>"; };
@@ -207,6 +209,7 @@
 			isa = PBXGroup;
 			children = (
 				22CC38286D12E7C5A42F9698 /* NoteEditor.swift */,
+				D90DA14AE288F7791502A938 /* Overlays.swift */,
 				BA11F099D76108D79CC03241 /* PhotoContextMenu.swift */,
 				9E4BD60901C993AB83711D73 /* SlotImageLoader.swift */,
 				C140CD919A5CE9C179243D19 /* TabBar.swift */,
@@ -421,6 +424,7 @@
 				C6CFE0362AEA50F78A895927 /* LoupeView.swift in Sources */,
 				A72EB850B3B8306B6874A933 /* MoveCopySheet.swift in Sources */,
 				D30184AD636B5E5246EA1F51 /* NoteEditor.swift in Sources */,
+				E2FA9178E712E7F8E63A0CF4 /* Overlays.swift in Sources */,
 				501A4CBFDEE5286E37AAA91F /* PhotoContextMenu.swift in Sources */,
 				65282DCF055E487AA3803BBD /* PhotoCullerApp.swift in Sources */,
 				BDC34AA286B574295FDBDE93 /* PhotoItem.swift in Sources */,

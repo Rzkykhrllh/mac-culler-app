@@ -49,6 +49,11 @@ final class FolderSession {
     var showClipping = false
     /// Short message shown over the photos (e.g. "No face found").
     var toast: String?
+    /// Large transient confirmation of a mark (e.g. "★★★", "Pick · 5 photos").
+    var hud: MarkHUD?
+    /// In-window shortcut sheet (?).
+    var showShortcuts = false
+    @ObservationIgnored var hudTask: Task<Void, Never>?
     @ObservationIgnored var toastTask: Task<Void, Never>?
     /// Which subject Y zoomed to last, per item (pressing Y again cycles).
     @ObservationIgnored var subjectCycle: [ItemID: Int] = [:]

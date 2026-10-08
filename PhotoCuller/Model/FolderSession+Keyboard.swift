@@ -94,5 +94,6 @@ extension FolderSession {
         guard m != old else { return }
         setMetadata([(id, m)])
         pushUndo(.metadata([(id, old, m)]))
+        showHUD(for: .note(text), count: 1, result: old)
     }
 }

@@ -5,6 +5,63 @@ import CullerKit
 /// DEBUG-only smoke test driven through the real session (launch with `-openFolder <dir> -selfTest`).
 /// Exercises marking → background write → undo, stacks, filters, compare and rename planning inside the sandbox.
 enum DebugSelfTest {
+    /// `-openFolder <dir> -uiSnapshots`: renders key UI states to Documents/Snapshots for review.
+    static func runSnapshots(_ s: FolderSession) async {
+        while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        guard let w = KeyboardController.shared.mainWindow, let content = w.contentView else { return }
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Snapshots")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        func snap(_ name: String) {
+            content.layoutSubtreeIfNeeded()
+            guard let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) else { return }
+            content.cacheDisplay(in: content.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name + ".png"))
+            Log.session.info("SNAP \(name, privacy: .public)")
+        }
+        w.setContentSize(NSSize(width: 1300, height: 820))
+        s.viewMode = .grid
+        try? await Task.sleep(for: .seconds(4))   // thumbnails
+        // A few marks to show the badges (undone at the end).
+        let ids = s.display.prefix(6).map(\.itemID)
+        let cmds: [MarkCommand] = [.flag(.pick), .flag(.reject), .rating(3), .toggleLabel(.red), .note("check focus"), .rating(5)]
+        for (id, c) in zip(ids, cmds) { s.apply(c, toItem: id) }
+        s.hud = nil
+        try? await Task.sleep(for: .milliseconds(600))
+        snap("grid")
+        // Hover on the 3rd cell, pointer over the 4th star.
+        func cells(_ v: NSView) -> [ThumbnailCellView] { (v as? ThumbnailCellView).map { [$0] } ?? v.subviews.flatMap(cells) }
+        if let cell = cells(content).sorted(by: { $0.convert($0.bounds, to: nil).minX < $1.convert($1.bounds, to: nil).minX }).dropFirst(2).first(where: { $0.convert($0.bounds, to: nil).maxY > 300 }) {
+            let r = cell.convert(cell.bounds, to: nil)
+            let p = NSPoint(x: r.maxX - 32, y: r.minY + 24)
+            if let enter = NSEvent.enterExitEvent(with: .mouseEntered, location: p, modifierFlags: [], timestamp: 0, windowNumber: w.windowNumber,
+                                                  context: nil, eventNumber: 0, trackingNumber: 0, userData: nil),
+               let move = NSEvent.mouseEvent(with: .mouseMoved, location: p, modifierFlags: [], timestamp: 0, windowNumber: w.windowNumber,
+                                             context: nil, eventNumber: 0, clickCount: 0, pressure: 0) {
+                cell.mouseEntered(with: enter)
+                cell.mouseMoved(with: move)
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            snap("grid-hover")
+        }
+        if let id = ids.dropFirst(2).first { s.select(id) }
+        s.apply(.rating(4))
+        try? await Task.sleep(for: .milliseconds(250))
+        snap("hud")
+        try? await Task.sleep(for: .milliseconds(900))
+        s.showShortcuts = true
+        try? await Task.sleep(for: .milliseconds(500))
+        snap("shortcuts")
+        s.showShortcuts = false
+        s.viewMode = .loupe
+        try? await Task.sleep(for: .seconds(2))
+        snap("loupe")
+        s.viewMode = .grid
+        // Undo the demo marks.
+        for _ in 0..<(cmds.count + 1) { s.undo() }
+        try? await Task.sleep(for: .milliseconds(1500))
+        Log.session.info("SNAP done")
+    }
+
     /// `-openFolder <dir> -focusTest`: focus analysis, sharpest-in-stack, zoom-to-subject and overlays on real photos.
     static func runFocus(_ s: FolderSession) async {
         var failures: [String] = []
