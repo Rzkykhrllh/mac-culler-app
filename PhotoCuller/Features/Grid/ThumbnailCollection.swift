@@ -80,9 +80,14 @@ struct ThumbnailCollection: NSViewRepresentable {
         private var lastWidth: CGFloat = 0
         private var syncing = false
         private var prefetchTasks: [IndexPath: Task<Void, Never>] = [:]
-        /// Separate RAW/JPEG mode: the other file of the *current* photo gets a dashed outline.
-        /// (It follows the pointer, not the mouse, so there is only ever one pair marked.)
-        private var currentPartner: ItemID? { parent.currentID.flatMap { parent.session.partner(of: $0) } }
+        /// Separate RAW/JPEG mode: the other file of every selected photo gets a dashed outline
+        /// (follows the selection, not the mouse). Partners that are selected themselves keep the orange outline.
+        private var partners: Set<ItemID> = []
+        private func computePartners() -> Set<ItemID> {
+            var picked = parent.selection
+            if let c = parent.currentID { picked.insert(c) }
+            return Set(picked.compactMap { parent.session.partner(of: $0) }).subtracting(picked)
+        }
 
         init(_ p: ThumbnailCollection) {
             parent = p
@@ -103,6 +108,7 @@ struct ThumbnailCollection: NSViewRepresentable {
         func apply(_ p: ThumbnailCollection, force: Bool) {
             parent = p
             guard let cv = collectionView else { return }
+            partners = computePartners()
             cv.contextMenuProvider = p.contextMenu
             var reloaded = false
             // Strip: remember where the pointer sits on screen so the reload doesn't make the strip jump.
@@ -186,11 +192,10 @@ struct ThumbnailCollection: NSViewRepresentable {
         }
 
         private func refreshVisibleState(_ cv: NSCollectionView) {
-            let partner = currentPartner
             for case let cell as ThumbnailCell in cv.visibleItems() {
                 guard let id = cell.representedID else { continue }
                 cell.cellView.isCurrent = id == parent.currentID
-                cell.cellView.isPartnerHighlighted = id == partner
+                cell.cellView.isPartnerHighlighted = partners.contains(id)
                 cell.cellView.compareSlot = parent.compareSlots.firstIndex(of: id)
                 if parent.style.isStrip { cell.cellView.isSelectedCell = parent.selection.contains(id) }
             }
@@ -243,7 +248,7 @@ struct ThumbnailCollection: NSViewRepresentable {
             }
             cell.cellView.manualClicks = parent.style.isStrip
             cell.cellView.partnerName = parent.session.partner(of: id).flatMap { parent.session.items[$0]?.fileName }
-            cell.cellView.isPartnerHighlighted = id == currentPartner
+            cell.cellView.isPartnerHighlighted = partners.contains(id)
             cell.cellView.onQuickMark = parent.onQuickMark.map { f in { cmd in f(id, cmd) } }
             if parent.style.isStrip {
                 cell.cellView.isSelectedCell = parent.selection.contains(id)

@@ -120,7 +120,7 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
     var onQuickMark: ((MarkCommand) -> Void)?
     /// Separate RAW/JPEG mode: file name of the other half of this shot (nil when not separated).
     var partnerName: String? { didSet { if oldValue != partnerName { needsDisplay = true } } }
-    /// The other file of the current photo (separate mode): drawn with a dashed outline.
+    /// The other file of a selected photo (separate mode): drawn with a dashed outline.
     var isPartnerHighlighted = false { didSet { if oldValue != isPartnerHighlighted { needsDisplay = true } } }
     /// Badge rects → explanation, for tooltips.
     private var tips: [(NSRect, String)] = []
@@ -414,9 +414,9 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         let pad: CGFloat = compact ? 3 : 5
         let showHoverBar = isHovered && !compact && image != nil && r.width > 110
 
-        // The other file of the current photo (separate RAW/JPEG mode): white dashed outline + PAIR tag.
+        // The other file of a selected photo (separate RAW/JPEG mode): white dashed outline + PAIR tag.
         // Deliberately not orange: orange always means "pointer / selected".
-        if isPartnerHighlighted && !isCurrent {
+        if isPartnerHighlighted && !isCurrent && !isSelectedCell {
             let dashed = NSBezierPath(roundedRect: b.insetBy(dx: 1.5, dy: 1.5), xRadius: radius, yRadius: radius)
             dashed.lineWidth = 2
             dashed.setLineDash([7, 5], count: 2, phase: 0)
