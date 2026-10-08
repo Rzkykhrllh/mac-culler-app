@@ -143,6 +143,8 @@ struct AppCommands: Commands {
             Group {
                 Button("Expand / Collapse Selected Stacks") { session?.toggleSelectedStacks() }
                     .keyboardShortcut("s", modifiers: [])
+                Button("Go to Sharpest in Stack") { session?.goToSharpest() }
+                    .keyboardShortcut("b", modifiers: [])
                 Button("Expand All Stacks") { session?.expandAllStacks(true) }
                     .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
                 Button("Collapse All Stacks") { session?.expandAllStacks(false) }
@@ -211,6 +213,12 @@ struct AppCommands: Commands {
                     .keyboardShortcut("i", modifiers: [])
                 Toggle("Histogram", isOn: Binding(get: { session?.showHistogram ?? false }, set: { session?.showHistogram = $0 }))
                     .keyboardShortcut("h", modifiers: [])
+                Toggle("Focus Peaking", isOn: Binding(get: { session?.showPeaking ?? false }, set: { session?.showPeaking = $0 }))
+                    .keyboardShortcut("f", modifiers: [])
+                Toggle("Highlight / Shadow Clipping", isOn: Binding(get: { session?.showClipping ?? false }, set: { session?.showClipping = $0 }))
+                    .keyboardShortcut("j", modifiers: [])
+                Button("Zoom to Eyes / Face / Animal") { session?.zoomToSubject() }
+                    .keyboardShortcut("y", modifiers: [])
                 Toggle("Filmstrip", isOn: Binding(get: { session?.showFilmstrip ?? true }, set: { session?.showFilmstrip = $0 }))
                     .keyboardShortcut("b", modifiers: [.command, .option])
             }

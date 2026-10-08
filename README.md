@@ -80,6 +80,14 @@ Packages/CullerKit/          Core library, fully unit-tested (`swift test`)
   ≤ 1 s apart (spec §4.4). *Similar* groups consecutive photos that look alike using on-device Vision feature prints
   (≈130 photos/s, cached in the index), so a scene shot over several seconds stays together; a strict ↔ loose
   slider (⌥[ / ⌥]) regroups instantly. Different cameras, or photos more than 10 minutes apart, never stack.
+- **Focus tools** (all on-device, cached in the index):
+  - **F** focus peaking — sharp edges painted red (Sobel on sRGB luminance, Accelerate, ≈35 ms at 2560 px).
+  - **J** clipping — blown highlights red, crushed shadows blue (8-bit sRGB thresholds).
+  - **Y** zoom to eyes / face / animal — Vision face landmarks + animal recognition; 100% on the subject, in compare
+    every slot on its own subject; press again for the next subject.
+  - **B** go to the sharpest frame of the stack — a green ◎ badge marks it. Sharpness is measured on the subject and
+    normalized (share of detail a slight blur destroys), so it compares frames of the same scene; no badge when frames
+    are too close to call. It is a hint: nothing is picked automatically.
 - **Selection**: ⇧/⌘-click, drag, ⇧+arrows. `S` expands/collapses every selected stack. Marks apply to the whole selection.
 - **Right-click** any photo (grid, filmstrip, loupe, compare) for all photo actions, with their shortcuts shown.
 - **Compare**: drag photos from the filmstrip onto the left / right slot; ⌥A switches the filmstrip between the

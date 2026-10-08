@@ -7,13 +7,22 @@ import CullerKit
 @Observable
 final class SlotImageLoader {
     private(set) var itemID: ItemID?
-    private(set) var image: CGImage?
+    private(set) var image: CGImage? {
+        didSet { if image !== oldValue { refreshOverlays() } }
+    }
     private(set) var pixelSize: CGSize = CGSize(width: 1, height: 1)
     private(set) var isFullResolution = false
     private(set) var isLoadingFull = false
     private(set) var failed = false
     /// Milliseconds from request to the first preview being shown (debug overlay).
     private(set) var lastShowMs: Double = 0
+    /// Focus-peaking / clipping overlays for the image currently shown (nil while off).
+    private(set) var peaking: CGImage?
+    private(set) var clipping: CGImage?
+    @ObservationIgnored private var wantPeaking = false
+    @ObservationIgnored private var wantClipping = false
+    @ObservationIgnored private var overlayTask: Task<Void, Never>?
+    @ObservationIgnored private var overlaySource: CGImage?
 
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private var fullTask: Task<Void, Never>?
@@ -89,6 +98,37 @@ final class SlotImageLoader {
                 self.failed = true
             }
             if self.wantsFull { self.loadFull() }
+        }
+    }
+
+    /// Turns the overlays on/off; they follow the shown image (preview → full resolution).
+    func setOverlays(peaking p: Bool, clipping c: Bool) {
+        guard p != wantPeaking || c != wantClipping else { return }
+        wantPeaking = p
+        wantClipping = c
+        overlaySource = nil
+        refreshOverlays()
+    }
+
+    private func refreshOverlays() {
+        guard let img = image, wantPeaking || wantClipping else {
+            overlayTask?.cancel()
+            peaking = nil
+            clipping = nil
+            overlaySource = nil
+            return
+        }
+        guard overlaySource !== img else { return }
+        overlaySource = img
+        overlayTask?.cancel()
+        let p = wantPeaking, c = wantClipping
+        overlayTask = Task { [weak self] in
+            let (pk, cl) = await Offload.run {
+                (p ? FocusOverlays.peaking(img) : nil, c ? FocusOverlays.clipping(img) : nil)
+            }
+            guard let self, !Task.isCancelled, self.image === img else { return }
+            self.peaking = pk
+            self.clipping = cl
         }
     }
 

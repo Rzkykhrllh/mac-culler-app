@@ -41,6 +41,19 @@ final class ViewportHub {
 
     func resetOffsets() { offsets.removeAll() }
 
+    /// Zooms every given slot to its own point (e.g. each photo's eyes). Offsets are set so synced panning
+    /// afterwards keeps each slot on its subject.
+    func focus(on centers: [Int: CGPoint], active: Int, zoom: CGFloat) {
+        guard let anchor = centers[active] ?? centers.values.first else { return }
+        lastViewport = Viewport(center: anchor, zoom: zoom, isFit: false)
+        applying = true
+        for (slot, c) in centers {
+            offsets[slot] = CGPoint(x: c.x - anchor.x, y: c.y - anchor.y)
+            view(slot: slot)?.apply(Viewport(center: c, zoom: zoom, isFit: false))
+        }
+        applying = false
+    }
+
     func offset(for slot: Int) -> CGPoint { offsets[slot] ?? .zero }
 
     /// Called by a view after the user zoomed or panned it.
@@ -90,6 +103,19 @@ final class ImageCanvasView: NSView {
     var image: CGImage? {
         didSet { layer?.contents = image }
     }
+    /// Focus-peaking / clipping overlays, stretched over the image like it.
+    private let peakLayer = CALayer(), clipLayer = CALayer()
+    var peaking: CGImage? { didSet { peakLayer.contents = peaking } }
+    var clipping: CGImage? { didSet { clipLayer.contents = clipping } }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        peakLayer.frame = bounds
+        clipLayer.frame = bounds
+        CATransaction.commit()
+    }
     weak var scrollView: ZoomScrollView?
     private var dragStart: NSPoint?
     private var dragOrigin: NSPoint = .zero
@@ -102,6 +128,12 @@ final class ImageCanvasView: NSView {
         layer?.minificationFilter = .trilinear
         layer?.magnificationFilter = .nearest
         layerContentsRedrawPolicy = .never
+        for l in [clipLayer, peakLayer] {
+            l.contentsGravity = .resize
+            l.magnificationFilter = .nearest
+            l.actions = ["contents": NSNull(), "bounds": NSNull(), "position": NSNull()]
+            layer?.addSublayer(l)
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -359,6 +391,8 @@ struct ZoomableImage: NSViewRepresentable {
     var contextMenu: () -> NSMenu? = { nil }
     var onDropItem: ((ItemID) -> Void)?
     var onDragHover: (Bool) -> Void = { _ in }
+    var peaking: CGImage?
+    var clipping: CGImage?
 
     final class Coordinator {
         var contentID: String?
@@ -379,6 +413,8 @@ struct ZoomableImage: NSViewRepresentable {
         v.contextMenuProvider = contextMenu
         v.onDropItem = onDropItem
         v.onDragHover = onDragHover
+        if v.canvas.peaking !== peaking { v.canvas.peaking = peaking }
+        if v.canvas.clipping !== clipping { v.canvas.clipping = clipping }
         if hub.view(slot: slot) !== v { hub.register(v, slot: slot) }
         let c = context.coordinator
         if c.contentID != contentID {

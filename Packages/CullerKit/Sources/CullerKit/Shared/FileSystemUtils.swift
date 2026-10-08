@@ -109,3 +109,22 @@ extension URL {
         return try u.resourceValues(forKeys: keys)
     }
 }
+
+/// Runs blocking work (Vision, Core Image renders) on its own GCD queue, never on Swift concurrency's
+/// cooperative pool: Vision waits on internal work that needs threads, and blocking every pool thread
+/// with it deadlocks the process.
+public enum Offload {
+    private static let queue = DispatchQueue(label: "PhotoCuller.offload", qos: .utility, attributes: .concurrent)
+    private static let gate = DispatchSemaphore(value: 3)
+
+    public static func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { cont in
+            queue.async {
+                gate.wait()
+                let v = work()
+                gate.signal()
+                cont.resume(returning: v)
+            }
+        }
+    }
+}

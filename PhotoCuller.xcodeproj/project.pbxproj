@@ -24,6 +24,7 @@
 		501A4CBFDEE5286E37AAA91F /* PhotoContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA11F099D76108D79CC03241 /* PhotoContextMenu.swift */; };
 		5046B573401AE35A47AD4EF2 /* ThumbnailCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3B22C1C607B8B0DA285492 /* ThumbnailCell.swift */; };
 		55BFBD6774FDF00808C04C2C /* CullerKit in Frameworks */ = {isa = PBXBuildFile; productRef = B43CE62A7298C2877484F302 /* CullerKit */; };
+		58455F5B0A9C753982E44F16 /* FolderSession+Focus.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE6D072D943A4F714F83D705 /* FolderSession+Focus.swift */; };
 		5DA5A0FF694285A4C5431A80 /* FolderSession+Similarity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74CCC470E0969E590855D47B /* FolderSession+Similarity.swift */; };
 		5E5484A6D10D4B2F6D296633 /* CompareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58C43139E1E31972F529FCD1 /* CompareView.swift */; };
 		65282DCF055E487AA3803BBD /* PhotoCullerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0465FF44B707A61CE518A4D /* PhotoCullerApp.swift */; };
@@ -98,6 +99,7 @@
 		E8DB1177F0330325CFFCA700 /* RenameSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenameSheet.swift; sourceTree = "<group>"; };
 		F716C156361A0B0B0DBD78B1 /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
 		FCFA2AD9A4D0195A9F635C58 /* FolderSession+FileOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FolderSession+FileOps.swift"; sourceTree = "<group>"; };
+		FE6D072D943A4F714F83D705 /* FolderSession+Focus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FolderSession+Focus.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -223,6 +225,7 @@
 				A0C0D648E420ED9AFC49DEF5 /* FolderSession.swift */,
 				CF1CB06B042E883374E875E7 /* FolderSession+Display.swift */,
 				FCFA2AD9A4D0195A9F635C58 /* FolderSession+FileOps.swift */,
+				FE6D072D943A4F714F83D705 /* FolderSession+Focus.swift */,
 				3CFD91841A736D2057C95734 /* FolderSession+Keyboard.swift */,
 				617E518A121A2989ED623172 /* FolderSession+Marking.swift */,
 				74CCC470E0969E590855D47B /* FolderSession+Similarity.swift */,
@@ -401,6 +404,7 @@
 				2CF25C27E8145ED89840B13B /* FilterBar.swift in Sources */,
 				CE7D0D437B8595632D538990 /* FolderSession+Display.swift in Sources */,
 				38A4090A38E5DA172CF8E5F0 /* FolderSession+FileOps.swift in Sources */,
+				58455F5B0A9C753982E44F16 /* FolderSession+Focus.swift in Sources */,
 				483E1931AC3930C225572018 /* FolderSession+Keyboard.swift in Sources */,
 				3BC4A84C835AA5CEE9A5C30E /* FolderSession+Marking.swift in Sources */,
 				5DA5A0FF694285A4C5431A80 /* FolderSession+Similarity.swift in Sources */,

@@ -19,6 +19,10 @@ enum KeyAction: Equatable {
     case toggleSyncZoom
     case togglePinBest
     case toggleStripShowsAll
+    case togglePeaking
+    case toggleClipping
+    case zoomToSubject
+    case sharpest
 }
 
 struct KeyBinding {
@@ -89,6 +93,10 @@ enum KeyMap {
             .init(key: .character("i"), action: .toggleInfo, title: "Info panel"),
             .init(key: .character("h"), action: .toggleHistogram, title: "Histogram"),
             .init(key: .character("m"), action: .editNote, title: "Edit note"),
+            .init(key: .character("f"), action: .togglePeaking, title: "Focus peaking"),
+            .init(key: .character("j"), action: .toggleClipping, title: "Highlight / shadow clipping"),
+            .init(key: .character("y"), action: .zoomToSubject, title: "Zoom to eyes / face / animal (again: next)"),
+            .init(key: .character("b"), action: .sharpest, title: "Go to sharpest in stack"),
             .init(key: .code(KeyCode.f2), action: .rename, title: "Rename…"),
             .init(key: .code(KeyCode.escape), action: .escape, title: "Back"),
         ]

@@ -5,6 +5,96 @@ import CullerKit
 /// DEBUG-only smoke test driven through the real session (launch with `-openFolder <dir> -selfTest`).
 /// Exercises marking → background write → undo, stacks, filters, compare and rename planning inside the sandbox.
 enum DebugSelfTest {
+    /// `-openFolder <dir> -focusTest`: focus analysis, sharpest-in-stack, zoom-to-subject and overlays on real photos.
+    static func runFocus(_ s: FolderSession) async {
+        var failures: [String] = []
+        func check(_ ok: Bool, _ what: String) {
+            Log.session.info("FOCUSTEST \(ok ? "ok  " : "FAIL", privacy: .public) \(what, privacy: .public)")
+            if !ok { failures.append(what) }
+        }
+        while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        let saved = (s.settings.stackBursts, s.settings.groupingMode)
+        defer { s.settings.stackBursts = saved.0; s.settings.groupingMode = saved.1; s.regroup() }
+        s.settings.stackBursts = true
+        s.settings.groupingMode = .time
+        s.regroup()
+        let t0 = Date()
+        while s.analysisTask != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        let all = Array(s.items.values)
+        check(all.allSatisfy { $0.analysis != nil }, "all \(all.count) photos analyzed in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+        let withSubject = all.filter { !($0.analysis?.subjects.isEmpty ?? true) }
+        check(!withSubject.isEmpty, "subjects found in \(withSubject.count)/\(all.count): \(Set(withSubject.compactMap { $0.analysis?.subjects.first?.label ?? $0.analysis?.subjects.first?.kind.rawValue }))")
+        for members in s.stackMembers.values.sorted(by: { ($0.first ?? "") < ($1.first ?? "") }) {
+            let desc = members.map { id -> String in
+                let i = s.items[id]!
+                return "\((id as NSString).lastPathComponent.replacingOccurrences(of: ".JPG", with: ""))=\(Int(i.analysis?.sharpness ?? -1))\(i.isSharpestInStack ? "★" : "")"
+            }.joined(separator: " ")
+            Log.session.info("FOCUSTEST stack \(desc, privacy: .public)")
+        }
+        let marked = all.filter(\.isSharpestInStack)
+        check(!marked.isEmpty && marked.allSatisfy { s.stackOf[$0.id] != nil }, "sharpest marked in \(marked.count) of \(s.stackMembers.count) stacks")
+        if let best = marked.first, let sid = s.stackOf[best.id], let other = s.stackMembers[sid]?.first(where: { $0 != best.id }) {
+            s.select(other)
+            s.goToSharpest()
+            check(s.currentID == best.id, "B jumps to the sharpest frame")
+        }
+        // Y in loupe.
+        if let subj = withSubject.first {
+            s.select(subj.id)
+            s.viewMode = .loupe
+            try? await Task.sleep(for: .milliseconds(1500))
+            s.zoomToSubject()
+            try? await Task.sleep(for: .milliseconds(1500))
+            let vp = s.viewports.view(slot: 0)?.currentViewport
+            let target = subj.analysis!.subjects[0].focusPoint
+            check(vp?.isFit == false && abs((vp?.zoom ?? 0) - 1) < 0.05, "Y zooms to 100% (zoom \(String(format: "%.2f", vp?.zoom ?? 0)))")
+            if let c = vp?.center {
+                // The clip view may clamp at the image edge; allow for that.
+                check(abs(c.x - target.x) < 0.2 && abs(c.y - target.y) < 0.2, "Y centers on the subject (\(String(format: "%.2f,%.2f", c.x, c.y)) → target \(String(format: "%.2f,%.2f", target.x, target.y)))")
+            }
+            // Overlays.
+            s.showPeaking = true
+            s.showClipping = true
+            try? await Task.sleep(for: .milliseconds(1500))
+            let canvas = s.viewports.view(slot: 0)?.canvas
+            check(canvas?.peaking != nil && canvas?.clipping != nil, "peaking + clipping overlays shown (\(canvas?.peaking?.width ?? 0)×\(canvas?.peaking?.height ?? 0) for image \(canvas?.image?.width ?? 0)×\(canvas?.image?.height ?? 0))")
+            if let img = canvas?.image {
+                let t = Date(); _ = FocusOverlays.peaking(img); let pm = Date().timeIntervalSince(t) * 1000
+                let t2 = Date(); _ = FocusOverlays.clipping(img); let cm = Date().timeIntervalSince(t2) * 1000
+                check(pm < 300 && cm < 300, "overlay render \(Int(pm)) ms peaking, \(Int(cm)) ms clipping at \(img.width) px")
+                if let pk = canvas?.peaking, let cl = canvas?.clipping {
+                    let all = FocusOverlays.coverage(pk), onSubject = FocusOverlays.coverage(pk, in: subj.analysis!.subjects[0].rect)
+                    check(onSubject > all && all > 0.002, "peaking lights the subject (\(String(format: "%.1f%%", onSubject * 100)) vs frame \(String(format: "%.1f%%", all * 100)))")
+                    check(FocusOverlays.coverage(cl) < 0.1, "clipping only marks extremes (\(String(format: "%.2f%%", FocusOverlays.coverage(cl) * 100)))")
+                }
+            }
+            s.viewports.view(slot: 0)?.apply(.fit)
+            try? await Task.sleep(for: .milliseconds(800))
+            if let w = KeyboardController.shared.mainWindow, let content = w.contentView, let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) {
+                content.cacheDisplay(in: content.bounds, to: rep)
+                let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Snapshots")
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent("peaking.png"))
+            }
+            s.showPeaking = false
+            s.showClipping = false
+        }
+        // Y in compare: each slot on its own subject.
+        let two = withSubject.prefix(2).map(\.id)
+        if two.count == 2 {
+            s.viewMode = .grid
+            s.selection = Set(two)
+            s.enterCompare()
+            try? await Task.sleep(for: .milliseconds(1500))
+            s.zoomToSubject()
+            try? await Task.sleep(for: .milliseconds(1500))
+            let a = s.viewports.view(slot: 0)?.currentViewport, b = s.viewports.view(slot: 1)?.currentViewport
+            check(a?.isFit == false && b?.isFit == false, "Y zooms every compare slot")
+            s.viewMode = .grid
+        }
+        Log.session.info("FOCUSTEST \(failures.isEmpty ? "PASS" : "FAILED: \(failures)", privacy: .public)")
+    }
+
     /// `-openFolder <dir> -similarityTest`: similarity grouping on real photos, logs the groups by file name.
     static func runSimilarity(_ s: FolderSession) async {
         var failures: [String] = []

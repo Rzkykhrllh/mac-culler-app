@@ -21,6 +21,23 @@ struct InfoPanel: View {
                             Label(msg, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                         }
                     }
+                    if let a = item.analysis {
+                        Section("Focus") {
+                            LabeledContent("Sharpness") {
+                                HStack(spacing: 6) {
+                                    Text(String(format: "%.0f", a.sharpness)).monospacedDigit()
+                                    if item.isSharpestInStack {
+                                        Label("sharpest in stack", systemImage: "scope").font(.caption).foregroundStyle(.green)
+                                    }
+                                }
+                            }
+                            LabeledContent("Subject") {
+                                Text(a.subjects.first.map { $0.kind == .face ? ($0.eyes.isEmpty ? "Face" : "Face, eyes") : ($0.label ?? "Animal") } ?? "None found")
+                            }
+                            Text("Compare sharpness between frames of the same scene. Y zooms to the subject, F shows focus peaking.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                     if let e = item.exif {
                         Section("Capture") {
                             row("Date", ExifFormat.captureDate(e))

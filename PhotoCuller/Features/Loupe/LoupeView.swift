@@ -17,7 +17,8 @@ struct LoupeView: View {
                               isFullResolution: loader.isFullResolution, slot: 0, hub: session.viewports,
                               onZoomChange: { loader.setZoomed($0) },
                               contextMenu: { PhotoContextMenu.make(session) },
-                              onDropItem: { session.select($0) })
+                              onDropItem: { session.select($0) },
+                              peaking: loader.peaking, clipping: loader.clipping)
                 ImageStateOverlay(loader: loader)
                 if let item = session.currentItem {
                     VStack {
@@ -44,7 +45,12 @@ struct LoupeView: View {
                 .padding(.bottom, 10)
             }
         }
-        .onAppear { show() }
+        .onAppear {
+            show()
+            loader.setOverlays(peaking: session.showPeaking, clipping: session.showClipping)
+        }
+        .onChange(of: session.showPeaking) { loader.setOverlays(peaking: session.showPeaking, clipping: session.showClipping) }
+        .onChange(of: session.showClipping) { loader.setOverlays(peaking: session.showPeaking, clipping: session.showClipping) }
         .onChange(of: session.currentID) { show() }
         .onChange(of: session.currentItem?.files) { show() }
         .onChange(of: session.imageRevision) { loader.reload(session.currentItem); prefetch() }

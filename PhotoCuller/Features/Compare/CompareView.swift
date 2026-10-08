@@ -32,6 +32,8 @@ struct CompareView: View {
             for (i, id) in session.compare.slots.enumerated() where loaders.indices.contains(i) { loaders[i].reload(id.flatMap { session.items[$0] }) }
         }
         .onChange(of: session.compare.syncZoom) { session.viewports.sync = session.compare.syncZoom }
+        .onChange(of: session.showPeaking) { syncLoaders() }
+        .onChange(of: session.showClipping) { syncLoaders() }
     }
 
     private var candidateEntries: [DisplayEntry] {
@@ -73,7 +75,8 @@ struct CompareView: View {
                               onDropItem: { session.put($0, inSlot: i) },
                               onDragHover: { over in
                                   if over { dropTarget = i } else if dropTarget == i { dropTarget = nil }
-                              })
+                              },
+                              peaking: loader.peaking, clipping: loader.clipping)
                 if id == nil {
                     VStack(spacing: 6) {
                         Image(systemName: "photo.badge.plus").font(.largeTitle)
@@ -143,6 +146,7 @@ struct CompareView: View {
         session.viewports.sync = session.compare.syncZoom
         for (i, id) in session.compare.slots.enumerated() {
             loaders[i].show(id.flatMap { session.items[$0] })
+            loaders[i].setOverlays(peaking: session.showPeaking, clipping: session.showClipping)
         }
     }
 }
