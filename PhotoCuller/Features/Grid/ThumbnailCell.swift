@@ -196,8 +196,8 @@ final class ThumbnailCellView: NSView, NSDraggingSource {
         }
         var top = NSColor(white: 1, alpha: 0.075), bottom = NSColor(white: 1, alpha: 0.03)
         if case .stackMember = entry?.kind {
-            top = NSColor(calibratedRed: 0.55, green: 0.6, blue: 1, alpha: 0.12)
-            bottom = NSColor(calibratedRed: 0.55, green: 0.6, blue: 1, alpha: 0.05)
+            top = Theme.nsAccentStart.withAlphaComponent(0.10)
+            bottom = Theme.nsAccentStart.withAlphaComponent(0.04)
         }
         if isSelectedCell || isCurrent {
             top = NSColor(white: 1, alpha: 0.14)

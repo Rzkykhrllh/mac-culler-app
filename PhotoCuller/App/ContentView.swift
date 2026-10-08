@@ -27,6 +27,14 @@ struct ContentView: View {
                 }
             }
             .appBackdrop()
+            // On the whole detail column, so tabs / path bar / mode switch shift left with the photos.
+            .inspector(isPresented: Binding(get: { app.session?.showInfoPanel ?? false },
+                                            set: { app.session?.showInfoPanel = $0 })) {
+                Group {
+                    if let s = app.session { InfoPanel(session: s) } else { Color.clear }
+                }
+                .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
+            }
         }
         .onAppear { app.activateRestoredTabIfNeeded() }
         .frame(minWidth: 1000, minHeight: 620)
@@ -92,10 +100,6 @@ struct SessionView: View {
             }
         }
         .animation(.smooth(duration: 0.2), value: session.showFilterBar)
-        .inspector(isPresented: $session.showInfoPanel) {
-            InfoPanel(session: session)
-                .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
-        }
         .toolbar { SessionToolbar(session: session) }
         .sheet(item: $session.activeSheet) { sheet in
             switch sheet {

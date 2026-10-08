@@ -6,8 +6,18 @@ extension FolderSession {
     func rebuildStacks() {
         let previousExpanded = expandedStacks.compactMap { stackMembers[$0] }
         let mode = fileView
-        let inputs = items.values.filter { mode.shows($0.files) }.map {
-            StackBuilder.Input(id: $0.id, captureDate: $0.exif?.captureDate, bodyKey: $0.exif?.bodyKey ?? "unknown")
+        guard settings.stackBursts else {
+            stackMembers = [:]
+            stackOf = [:]
+            expandedStacks = []
+            return
+        }
+        // In the separate modes a JPEG and its RAW share the exact capture time; keying stacks by file type
+        // keeps them from collapsing into one stack (only real bursts of the same type stack).
+        let inputs = items.values.filter { mode.shows($0.files) }.map { item -> StackBuilder.Input in
+            var key = item.exif?.bodyKey ?? "unknown"
+            if !mode.pairs { key += item.files.primary.kind.isRaw ? "|raw" : "|raster" }
+            return StackBuilder.Input(id: item.id, captureDate: item.exif?.captureDate, bodyKey: key)
         }
         let groups = StackBuilder.build(inputs, threshold: settings.burstThreshold)
         stackMembers = [:]

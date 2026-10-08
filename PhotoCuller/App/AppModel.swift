@@ -80,6 +80,15 @@ final class AppModel {
         for t in tabs { t.session?.imagesChanged() }
     }
 
+    /// ⇧S: burst stacks on / off (all tabs).
+    func setStackBursts(_ on: Bool) {
+        settings.stackBursts = on
+        for t in tabs {
+            t.session?.rebuildStacks()
+            t.session?.rebuildDisplay()
+        }
+    }
+
     func toggleSidebar() {
         sidebarVisibility = sidebarVisibility == .detailOnly ? .all : .detailOnly
     }

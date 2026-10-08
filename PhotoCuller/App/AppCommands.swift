@@ -126,6 +126,8 @@ struct AppCommands: Commands {
             }
             .disabled(!canAct)
             Divider()
+            Toggle("Stack Bursts", isOn: Binding(get: { app.settings.stackBursts }, set: { app.setStackBursts($0) }))
+                .keyboardShortcut("s", modifiers: .shift)
             Group {
                 Button("Expand / Collapse Selected Stacks") { session?.toggleSelectedStacks() }
                     .keyboardShortcut("s", modifiers: [])

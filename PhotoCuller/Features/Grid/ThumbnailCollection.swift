@@ -197,7 +197,14 @@ struct ThumbnailCollection: NSViewRepresentable {
                                isCurrent: entry.itemID == parent.currentID, compareSlot: parent.compareSlots.firstIndex(of: entry.itemID))
             }
             let id = entry.itemID
-            cell.cellView.onDoubleClick = { [weak self] in self?.parent.onActivate(id) }
+            cell.cellView.onDoubleClick = { [weak self] in
+                // Double-click on a collapsed stack opens it up; on a photo it opens the loupe.
+                if entry.isCollapsedStack, let sid = entry.stackID {
+                    self?.parent.onToggleStack(sid)
+                } else {
+                    self?.parent.onActivate(id)
+                }
+            }
             cell.cellView.manualClicks = parent.style.isStrip
             if parent.style.isStrip {
                 cell.cellView.isSelectedCell = parent.selection.contains(id)
