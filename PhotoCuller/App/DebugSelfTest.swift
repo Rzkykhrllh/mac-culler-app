@@ -463,10 +463,13 @@ enum DebugSelfTest {
         guard let first = s.display.first, let item = s.items[first.itemID] else { return check(false, "has items") }
         s.select(item.id)
         s.viewMode = .loupe
+        // Marks left by an interrupted earlier run are fine: undo must bring back exactly this state.
+        let startMarks = item.metadata
         s.apply(.flag(.pick))
         s.apply(.rating(4))
         s.apply(.toggleLabel(.green))
-        check(item.metadata == PhotoMetadata(flag: .pick, rating: 4, label: .green), "in-memory marks applied immediately")
+        check(item.metadata.flag == .pick && item.metadata.rating == 4 && item.metadata.label == (startMarks.label == .green ? .none : .green),
+              "in-memory marks applied immediately")
         try? await Task.sleep(for: .milliseconds(900))
         let onDisk = MetadataStore.read(item.files, recover: false).metadata
         check(onDisk == item.metadata, "marks written to disk: \(onDisk)")
@@ -480,9 +483,9 @@ enum DebugSelfTest {
         s.filter = FilterState()
 
         s.undo(); s.undo(); s.undo()
-        check(item.metadata == .empty, "undo x3 clears marks")
+        check(item.metadata == startMarks, "undo x3 restores the marks")
         try? await Task.sleep(for: .milliseconds(900))
-        check(MetadataStore.read(item.files, recover: false).metadata == .empty, "undo persisted to disk")
+        check(MetadataStore.read(item.files, recover: false).metadata == startMarks, "undo persisted to disk")
 
         // Advance with shift-style marking.
         s.apply(.rating(2), advance: true)
