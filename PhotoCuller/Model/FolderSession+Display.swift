@@ -152,13 +152,22 @@ extension FolderSession {
         }
     }
 
+    /// Expands / collapses one stack and puts the pointer on it: the first frame when expanding,
+    /// the cover when collapsing (so it never stays on a photo outside the stack).
     func toggleStack(_ sid: String) {
-        if expandedStacks.contains(sid) {
-            expandedStacks.remove(sid)
-        } else {
-            expandedStacks.insert(sid)
-        }
+        let expanding = !expandedStacks.contains(sid)
+        if expanding { expandedStacks.insert(sid) } else { expandedStacks.remove(sid) }
         rebuildDisplay()
+        pointAt(stack: sid, expanded: expanding)
+    }
+
+    /// Pointer + selection onto a stack after it was expanded / collapsed.
+    private func pointAt(stack sid: String, expanded: Bool) {
+        let target = expanded ? visibleMembers(ofStack: sid).first { displayIndex[$0] != nil }
+                              : display.first { $0.stackID == sid }?.itemID
+        guard let target else { return }
+        select(target)
+        selectionAnchor = target
     }
 
     /// S: expand / collapse the stack of the current item.
@@ -175,11 +184,19 @@ extension FolderSession {
         guard !sids.isEmpty else { return }
         let expand = sids.contains { !expandedStacks.contains($0) }
         if expand { expandedStacks.formUnion(sids) } else { expandedStacks.subtract(sids) }
+        let multi = sids.count > 1 || selection.count > 1
         rebuildDisplay()
-        // Keep every member of a newly expanded stack selected so the next action applies to the whole block.
-        if expand, sids.count > 1 || selection.count > 1 {
-            selection = Set(sids.flatMap { visibleMembers(ofStack: $0) }).union(selection.filter { displayIndex[$0] != nil })
+        // The pointer goes to the first (in display order) of the stacks just toggled.
+        let first = sids.min { (firstIndex(ofStack: $0) ?? .max) < (firstIndex(ofStack: $1) ?? .max) }
+        if let first { pointAt(stack: first, expanded: expand) }
+        // Keep every member of newly expanded stacks selected so the next action applies to the whole block.
+        if expand, multi {
+            selection = Set(sids.flatMap { visibleMembers(ofStack: $0) }).filter { displayIndex[$0] != nil }
         }
+    }
+
+    private func firstIndex(ofStack sid: String) -> Int? {
+        display.firstIndex { $0.stackID == sid }
     }
 
     func expandAllStacks(_ expand: Bool) {
