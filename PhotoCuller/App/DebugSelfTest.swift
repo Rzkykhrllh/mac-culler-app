@@ -10,8 +10,10 @@ enum DebugSelfTest {
         while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
         guard let w = KeyboardController.shared.mainWindow, let content = w.contentView else { return }
         let saved = (s.settings.stackBursts, s.settings.groupingMode)
-        defer { s.settings.stackBursts = saved.0; s.settings.groupingMode = saved.1; s.regroup() }
+        let savedSize = s.settings.thumbnailSize
+        defer { s.settings.stackBursts = saved.0; s.settings.groupingMode = saved.1; s.settings.thumbnailSize = savedSize; s.regroup() }
         s.settings.stackBursts = true; s.settings.groupingMode = .time; s.regroup()
+        s.settings.thumbnailSize = 160   // several rows on screen whatever the user's size is
         s.expandAllStacks(false)
         s.viewMode = .grid
         w.setContentSize(NSSize(width: 1300, height: 820))
@@ -87,11 +89,20 @@ enum DebugSelfTest {
             s.expandAllStacks(false)
             if let cover { s.select(cover) }
             s.viewMode = .loupe
-            try? await Task.sleep(for: .milliseconds(800))
+            // A leftover multi-selection from the grid must not survive the expand.
+            s.selection.formUnion(s.display.prefix(3).map(\.itemID))
+            try? await Task.sleep(for: .milliseconds(1200))
+            func ringX() -> CGFloat? { cells(content).first(where: \.isCurrent).map { $0.convert($0.bounds, to: nil).minX } }
+            let before = ringX()
             _ = s.perform(KeyMap.Match(action: .toggleStack, advance: false))
             try? await Task.sleep(for: .milliseconds(800))
+            let after = ringX()
             report("loupe, after S (expand)", stack: sid)
             expectFirst("loupe: expand → pointer on first frame")
+            let single = s.selection == Set([s.currentID].compactMap { $0 })
+            Log.session.info("EXPANDTEST \(single ? "ok  " : "FAIL", privacy: .public) loupe: only the first frame selected (\(s.selection.count, privacy: .public))")
+            let still = before != nil && after != nil && abs(before! - after!) < 2
+            Log.session.info("EXPANDTEST \(still ? "ok  " : "FAIL", privacy: .public) loupe: strip did not move (x \(before.map { "\($0)" } ?? "nil", privacy: .public) → \(after.map { "\($0)" } ?? "nil", privacy: .public))")
             s.viewMode = .grid
             s.apply(.flag(.none), toItem: members[2])
         }
@@ -112,6 +123,9 @@ enum DebugSelfTest {
             Log.session.info("SNAP \(name, privacy: .public)")
         }
         w.setContentSize(NSSize(width: 1300, height: 820))
+        let savedSize = s.settings.thumbnailSize
+        defer { s.settings.thumbnailSize = savedSize }
+        s.settings.thumbnailSize = 200   // same layout whatever size the user picked
         s.viewMode = .grid
         try? await Task.sleep(for: .seconds(4))   // thumbnails
         // A few marks to show the badges (undone at the end).
@@ -168,7 +182,19 @@ enum DebugSelfTest {
         s.settings.stackBursts = false
         s.setFileView(.both)
         try? await Task.sleep(for: .seconds(4))
-        if let jpgCell = cells(content).first(where: { $0.item?.files.primary.kind == .jpeg && $0.partnerName != nil }) {
+        // Select a JPG (its RAW gets the PAIR outline) and hover some other tile: all three states at once.
+        if let jpg = cells(content).first(where: { $0.item?.files.primary.kind == .jpeg && $0.partnerName != nil })?.item?.id {
+            s.select(jpg)
+            try? await Task.sleep(for: .milliseconds(300))
+            // Bring the pair on screen (synthetic RAWs sort after the JPGs).
+            func collection(_ v: NSView) -> NSCollectionView? { (v as? NSCollectionView) ?? v.subviews.lazy.compactMap(collection).first }
+            if let partner = s.partner(of: jpg), let i = s.displayIndex[partner], let cv = collection(content) {
+                cv.scrollToItems(at: [IndexPath(item: i, section: 0)], scrollPosition: .centeredVertically)
+                try? await Task.sleep(for: .milliseconds(600))
+            }
+        }
+        if let jpgCell = cells(content).first(where: { !$0.isCurrent && !$0.isPartnerHighlighted && $0.item != nil
+                                                        && $0.convert($0.bounds, to: nil).maxY > 300 }) {
             let r = jpgCell.convert(jpgCell.bounds, to: nil)
             let p = NSPoint(x: r.midX, y: r.midY)
             if let enter = NSEvent.enterExitEvent(with: .mouseEntered, location: p, modifierFlags: [], timestamp: 0, windowNumber: w.windowNumber,
@@ -177,7 +203,7 @@ enum DebugSelfTest {
             }
             try? await Task.sleep(for: .milliseconds(300))
             let lit = cells(content).filter(\.isPartnerHighlighted).compactMap { $0.item?.fileName }
-            Log.session.info("SNAP partner of \(jpgCell.item?.fileName ?? "?", privacy: .public) highlighted: \(lit, privacy: .public)")
+            Log.session.info("SNAP current \(s.currentItem?.fileName ?? "?", privacy: .public), hovered \(jpgCell.item?.fileName ?? "?", privacy: .public), pair: \(lit, privacy: .public)")
             snap("separate-hover")
             if let exit = NSEvent.enterExitEvent(with: .mouseExited, location: p, modifierFlags: [], timestamp: 0, windowNumber: w.windowNumber,
                                                  context: nil, eventNumber: 0, trackingNumber: 0, userData: nil) {

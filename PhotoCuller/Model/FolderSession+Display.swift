@@ -179,6 +179,7 @@ extension FolderSession {
         if expanding { expandedStacks.insert(sid) } else { expandedStacks.remove(sid) }
         rebuildDisplay()
         pointAt(stack: sid, expanded: expanding)
+        if viewMode != .grid, let c = currentID { selection = [c] }
     }
 
     /// Pointer + selection onto a stack after it was expanded / collapsed.
@@ -198,6 +199,14 @@ extension FolderSession {
 
     /// S with several photos selected: if any selected stack is collapsed, expand them all; otherwise collapse them all.
     func toggleSelectedStacks() {
+        // Outside the grid only one photo is in view: S opens the stack you are looking at, and the pointer
+        // lands on its first photo alone (a leftover multi-selection would light up the whole strip).
+        if viewMode != .grid {
+            guard let c = currentID, let sid = stackOf[c] else { return }
+            toggleStack(sid)
+            if let c = currentID { selection = [c] }
+            return
+        }
         var ids = selection
         if let c = currentID { ids.insert(c) }
         let sids = Set(ids.compactMap { stackOf[$0] })
