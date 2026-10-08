@@ -43,6 +43,7 @@
 		B4297B3A117FFBFCCD39669D /* FolderSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D988A255A80C2CBF86D40950 /* FolderSidebarView.swift */; };
 		B8813CD025D2CC05B125C1D1 /* FolderTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 426A995EFCF10C661F26943C /* FolderTree.swift */; };
 		BDC34AA286B574295FDBDE93 /* PhotoItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29192741C2FA2D7E675837CC /* PhotoItem.swift */; };
+		C59D504643D206056D06017A /* HangWatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BF8B6A589E0C011BC555706 /* HangWatch.swift */; };
 		C6CFE0362AEA50F78A895927 /* LoupeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FEE4D20BC4D260700BECBB4 /* LoupeView.swift */; };
 		C6D2AF86FF3EF7967047EF70 /* ZoomableImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61AC82EF33DEB9AB4C3B51AB /* ZoomableImageView.swift */; };
 		C6D7CFDD3C26B524EA6722B9 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28B7B72E192EE256B4149A5F /* SettingsView.swift */; };
@@ -76,6 +77,7 @@
 		5CD3F14F819B63FCDE63E0B3 /* MoveCopySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveCopySheet.swift; sourceTree = "<group>"; };
 		617E518A121A2989ED623172 /* FolderSession+Marking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FolderSession+Marking.swift"; sourceTree = "<group>"; };
 		61AC82EF33DEB9AB4C3B51AB /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
+		6BF8B6A589E0C011BC555706 /* HangWatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HangWatch.swift; sourceTree = "<group>"; };
 		6FEE4D20BC4D260700BECBB4 /* LoupeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoupeView.swift; sourceTree = "<group>"; };
 		74CCC470E0969E590855D47B /* FolderSession+Similarity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FolderSession+Similarity.swift"; sourceTree = "<group>"; };
 		757F01D35D243D04218EF4C2 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
@@ -280,6 +282,7 @@
 				29FC127B82166FA8F74B129E /* AppModel.swift */,
 				0CC85564F425AF243C23112B /* ContentView.swift */,
 				3120515515B65BCEB961B6C1 /* DebugSelfTest.swift */,
+				6BF8B6A589E0C011BC555706 /* HangWatch.swift */,
 				8D4EFCBB5268DE4F42969DBB /* KeyboardController.swift */,
 				D0465FF44B707A61CE518A4D /* PhotoCullerApp.swift */,
 			);
@@ -439,6 +442,7 @@
 				AB5589153219D846879567A5 /* Formatting.swift in Sources */,
 				9C92D295AFCEE8EFE63ECDC8 /* GettingStartedView.swift in Sources */,
 				03BC96B749B3322E7E2AE89E /* GridView.swift in Sources */,
+				C59D504643D206056D06017A /* HangWatch.swift in Sources */,
 				23BACE73BA56CA6B3657B479 /* HistoryWindow.swift in Sources */,
 				31E6015B003CE9A15F15300B /* InfoPanel.swift in Sources */,
 				917B79B46768E3AD503CBA4A /* KeyMap.swift in Sources */,

@@ -87,7 +87,7 @@ extension FolderSession {
         for (id, m) in values {
             guard let item = items[id] else { continue }
             if item.metadata.flag != m.flag, stackOf[id] != nil { needsRebuild = true }  // stack cover may change
-            item.metadata = m
+            setMarks(item, m)
             item.metadataLoaded = true
             enqueueWrite(item)
         }

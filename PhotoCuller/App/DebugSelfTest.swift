@@ -516,7 +516,9 @@ enum DebugSelfTest {
         var f = FilterState()
         f.flags = [.pick]
         s.filter = f
-        check(s.matchingCount == 1, "filter pick → 1 match (got \(s.matchingCount))")
+        // Picks left on other photos (e.g. by an interrupted earlier run) count too.
+        let otherPicks = s.items.values.filter { $0.id != item.id && $0.metadata.flag == .pick && s.fileView.shows($0.files) }.count
+        check(s.matchingCount == otherPicks + 1, "filter pick → \(otherPicks + 1) match (got \(s.matchingCount))")
         s.filter = FilterState()
 
         s.undo(); s.undo(); s.undo()

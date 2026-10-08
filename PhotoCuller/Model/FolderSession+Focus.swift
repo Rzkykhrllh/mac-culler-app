@@ -5,10 +5,40 @@ extension FolderSession {
     // MARK: Background analysis (faces / animals + sharpness)
 
     /// Analyzes every shown photo once (≈175 ms each, 3 in parallel; cached in the index by file attributes).
+    /// Above this many photos, focus analysis is not run on the whole folder (it decodes every photo:
+    /// hours of CPU for a tree of tens of thousands) but only around the photo being looked at.
+    static let fullAnalysisLimit = 3000
+
+    var isLargeFolder: Bool { items.count > Self.fullAnalysisLimit }
+
+    /// Large folders: the current photo, its stack, the compare candidates and its neighbours in the grid.
+    var analysisScope: Set<ItemID> {
+        var ids = Set(compare.candidates)
+        guard let c = currentID else { return ids }
+        ids.insert(c)
+        if let sid = stackOf[c], let m = stackMembers[sid] { ids.formUnion(m) }
+        if let i = displayIndex[c] {
+            for j in max(0, i - 12)...min(display.count - 1, i + 24) { ids.insert(display[j].itemID) }
+        }
+        return ids
+    }
+
+    /// Debounced: arrow-key browsing only analyzes where the pointer comes to rest.
+    func scheduleNearbyAnalysis() {
+        nearbyAnalysisTask?.cancel()
+        nearbyAnalysisTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            self?.ensureAnalysis()
+        }
+    }
+
     func ensureAnalysis() {
         guard phase == .ready, analysisTask == nil else { return }
         let mode = fileView
-        let missing = items.values.filter { $0.analysis == nil && mode.shows($0.files) }
+        let scope: Set<ItemID>? = isLargeFolder ? analysisScope : nil
+        let candidates = scope.map { $0.compactMap { items[$0] } } ?? Array(items.values)
+        let missing = candidates.filter { $0.analysis == nil && !analysisFailed.contains($0.id) && mode.shows($0.files) }
             .sorted { $0.captureDate < $1.captureDate }
             .map { (id: $0.id, files: $0.files) }
         guard !missing.isEmpty else { return }
@@ -44,16 +74,20 @@ extension FolderSession {
                 }
                 if Task.isCancelled { return }
                 var stored: [(FileRef, PhotoAnalysis)] = []
+                let analyzed = Set(results.map(\.0))
+                for (i, m) in chunk.enumerated() where !analyzed.contains(i) { self.analysisFailed.insert(m.id) }
                 for (i, a) in results {
                     self.items[chunk[i].id]?.analysis = a
                     stored.append((chunk[i].files.primary, a))
                 }
                 Task.detached(priority: .background) { index.storeAnalysis(stored) }
                 done += chunk.count
-                self.analysisProgress = (done, missing.count)
+                if self.shouldPublishProgress("analysis") { self.analysisProgress = (done, missing.count) }
                 if Date().timeIntervalSince(last) > 1.5 { last = Date(); self.updateSharpest() }
             }
             self.updateSharpest()
+            // The pointer may have moved on while this ran.
+            if self.isLargeFolder { self.scheduleNearbyAnalysis() }
         }
     }
 
@@ -62,10 +96,10 @@ extension FolderSession {
         var byID: [String: PhotoAnalysis] = [:]
         for members in stackMembers.values { for id in members { if let a = items[id]?.analysis { byID[id] = a } } }
         let best = FocusAnalyzer.sharpest(in: Array(stackMembers.values), analysis: byID)
-        for item in items.values {
-            let v = best.contains(item.id)
-            if item.isSharpestInStack != v { item.isSharpestInStack = v }
-        }
+        // Touch only the photos whose mark changes (not every photo of a huge folder).
+        for id in sharpestIDs.subtracting(best) { items[id]?.isSharpestInStack = false }
+        for id in best.subtracting(sharpestIDs) { items[id]?.isSharpestInStack = true }
+        sharpestIDs = best
     }
 
     // MARK: B — sharpest in stack

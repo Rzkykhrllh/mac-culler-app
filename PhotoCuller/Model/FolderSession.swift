@@ -25,7 +25,17 @@ final class FolderSession {
     var indexing: (done: Int, total: Int)?
 
     // Items
-    @ObservationIgnored var items: [ItemID: PhotoItem] = [:]
+    @ObservationIgnored var items: [ItemID: PhotoItem] = [:] { didSet { partnerIndexValid = false } }
+    /// The RAW/JPEG partner index only changes when photos are added, removed or renamed.
+    @ObservationIgnored var partnerIndexValid = false
+    @ObservationIgnored var partnerIndexMode: FileViewMode?
+    @ObservationIgnored var nearbyAnalysisTask: Task<Void, Never>?
+    /// Photos whose analysis failed (undecodable): not retried in this session.
+    @ObservationIgnored var analysisFailed: Set<ItemID> = []
+    /// Photos currently marked sharpest-in-stack, so updates only touch the ones that change.
+    @ObservationIgnored var sharpestIDs: Set<ItemID> = []
+    /// Last time each progress value was published (see `shouldPublishProgress`).
+    @ObservationIgnored var progressPublished: [String: Date] = [:]
     /// Bumped whenever the set of items or their order changes (views observing the display list use this).
     var itemsRevision = 0
 
@@ -74,7 +84,9 @@ final class FolderSession {
 
     // Selection & navigation
     var viewMode: ViewMode = .grid
-    var currentID: ItemID?
+    var currentID: ItemID? {
+        didSet { if oldValue != currentID, isLargeFolder { scheduleNearbyAnalysis() } }
+    }
     var selection: Set<ItemID> = []
     /// Direction of the last navigation step, used for prefetching (+1 / -1).
     @ObservationIgnored var lastDirection = 1
@@ -98,6 +110,13 @@ final class FolderSession {
     @ObservationIgnored let viewports = ViewportHub()
     /// Columns currently laid out in the grid (for ↑/↓).
     @ObservationIgnored var gridColumns = 1
+
+    /// Picks / rejects in the folder, for the status bar. Kept up to date here so views never have to read
+    /// (and observe) every photo — with tens of thousands of photos that alone made the UI stutter.
+    var pickCount = 0
+    var rejectCount = 0
+    @ObservationIgnored private var livePicks = 0
+    @ObservationIgnored private var liveRejects = 0
 
     // Undo
     @ObservationIgnored var undoStack: [UndoAction] = []
@@ -181,7 +200,7 @@ final class FolderSession {
     private func restorePendingWrites() {
         for p in app.index.pendingWrites(inFolder: folder) {
             guard let item = items[p.itemID] else { continue }
-            item.metadata = p.metadata
+            setMarks(item, p.metadata)
             item.metadataLoaded = true
             enqueueWrite(item)
         }
@@ -200,6 +219,9 @@ final class FolderSession {
             typealias Row = (id: ItemID, files: ItemFiles, meta: MetadataStore.ReadResult?, exif: ExifInfo?, triedExif: Bool)
             var done = 0
             var lastRebuild = Date()
+            // Rebuilding the grid while EXIF arrives keeps the order right, but for a huge tree one rebuild is
+            // expensive: wait at least 30× its cost between rebuilds so the UI always gets most of the time.
+            var rebuildInterval: TimeInterval = 1.5
             let chunk = 64
             var start = 0
             while start < todo.count {
@@ -232,25 +254,33 @@ final class FolderSession {
                         item.exif = ExifInfo()   // unreadable: don't retry forever
                     }
                     if let m = r.meta, !item.metadataLoaded {
-                        item.metadata = m.metadata
+                        self.setMarks(item, m.metadata, publish: false)
                         item.metadataLoaded = true
                         if let sc = m.recoveredSidecar { item.files.sidecarURL = sc }
                         metaRows.append((item.id, IndexStore.signature(of: item.files), m.metadata))
                     }
                 }
-                Task.detached(priority: .background) {
+                Task.detached(priority: .utility) {
                     index.storeExif(exifRows)
                     index.storeMetadata(metaRows)
                 }
                 done += rows.count
-                self.indexing = (done, todo.count)
-                if Date().timeIntervalSince(lastRebuild) > 1.5 {
-                    lastRebuild = Date()
+                if self.shouldPublishProgress("index") {
+                    self.indexing = (done, todo.count)
+                    self.publishFlagCounts()
+                }
+                if Date().timeIntervalSince(lastRebuild) > rebuildInterval {
+                    let t0 = Date()
                     self.rebuildStacks()
+                    let t1 = Date()
                     self.rebuildDisplay()
+                    lastRebuild = Date()
+                    rebuildInterval = max(1.5, lastRebuild.timeIntervalSince(t0) * 30)
+                    Log.session.info("PERF rebuild during indexing: stacks \(Int(t1.timeIntervalSince(t0) * 1000)) ms, display \(Int(lastRebuild.timeIntervalSince(t1) * 1000)) ms, \(self.items.count) items, next in \(Int(rebuildInterval)) s")
                 }
             }
             self?.indexing = nil
+            self?.publishFlagCounts()
             self?.rebuildStacks()
             self?.rebuildDisplay()
         }
@@ -260,9 +290,48 @@ final class FolderSession {
     func ensureLoaded(_ item: PhotoItem) {
         guard !item.metadataLoaded else { return }
         let r = MetadataStore.read(item.files)
-        item.metadata = r.metadata
+        setMarks(item, r.metadata)
         if let sc = r.recoveredSidecar { item.files.sidecarURL = sc }
         item.metadataLoaded = true
+    }
+
+    /// Progress bars update at most twice a second: every published change re-lays out the window, and
+    /// a background pass over a big folder produces dozens per second.
+    func shouldPublishProgress(_ key: String) -> Bool {
+        let now = Date()
+        if let last = progressPublished[key], now.timeIntervalSince(last) < 0.5 { return false }
+        progressPublished[key] = now
+        return true
+    }
+
+    /// Every metadata change goes through here so the pick / reject counts stay right.
+    /// `publish: false` (background indexing) defers the visible counts to the next `publishFlagCounts()`.
+    func setMarks(_ item: PhotoItem, _ m: PhotoMetadata, publish: Bool = true) {
+        let old = item.metadata.flag
+        item.metadata = m
+        guard old != m.flag else { return }
+        if old == .pick { livePicks -= 1 } else if old == .reject { liveRejects -= 1 }
+        if m.flag == .pick { livePicks += 1 } else if m.flag == .reject { liveRejects += 1 }
+        if publish { publishFlagCounts() }
+    }
+
+    func publishFlagCounts() {
+        if pickCount != livePicks { pickCount = livePicks }
+        if rejectCount != liveRejects { rejectCount = liveRejects }
+    }
+
+    func recountFlags() {
+        var p = 0, r = 0
+        for item in items.values {
+            switch item.metadata.flag {
+            case .pick: p += 1
+            case .reject: r += 1
+            default: break
+            }
+        }
+        livePicks = p
+        liveRejects = r
+        publishFlagCounts()
     }
 
     // MARK: Watching / refresh

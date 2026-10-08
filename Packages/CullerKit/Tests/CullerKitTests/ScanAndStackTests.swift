@@ -143,3 +143,27 @@ final class ScanAndStackTests: XCTestCase {
         XCTAssertFalse(f.matches(metadata: .empty, exif: exif, files: files))
     }
 }
+
+final class SortOrderTests: XCTestCase {
+    func testPrecomputedKeysMatchReferenceOrder() {
+        let base = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        var rows: [(files: ItemFiles, exif: ExifInfo?, metadata: PhotoMetadata)] = []
+        for i in 0..<400 {
+            let folder = "/shoot/day\(i % 3)"
+            let name = ["DSCF\(1000 + i / 2)", "img\(i % 17)", "IMG_\(i)"][i % 3] + (i % 2 == 0 ? ".JPG" : ".RAF")
+            let ref = FileRef(url: URL(fileURLWithPath: "\(folder)/\(name)"), kind: i % 2 == 0 ? .jpeg : .raw,
+                              size: Int64(i % 7) * 1000, modificationDate: base.addingTimeInterval(Double(i % 11)))
+            var exif = ExifInfo()
+            exif.captureDate = i % 5 == 0 ? nil : base.addingTimeInterval(Double(i / 4))
+            rows.append((ItemFiles(files: [ref]), exif, PhotoMetadata(rating: i % 6)))
+        }
+        for key in SortKey.allCases {
+            for asc in [true, false] {
+                let order = SortOrder(key: key, ascending: asc)
+                let fast = order.sorted(rows) { $0 }.map(\.files.primary.path)
+                let reference = rows.sorted { order.referenceOrder($0, $1) }.map(\.files.primary.path)
+                XCTAssertEqual(fast, reference, "\(key) \(asc ? "asc" : "desc")")
+            }
+        }
+    }
+}
