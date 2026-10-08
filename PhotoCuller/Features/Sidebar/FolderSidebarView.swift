@@ -30,7 +30,8 @@ struct FolderSidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 420)
+        .frame(minWidth: 180, idealWidth: 220)
+        .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
     }
 }
 

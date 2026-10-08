@@ -134,8 +134,11 @@ struct PathBar: View {
                     }
                 }
             }
-            Spacer(minLength: 8)
+            .layoutPriority(0)
+            .frame(minWidth: 60)
+            // The switch claims its width first (and picks a variant that fits); the path scrolls in the rest.
             FileViewSwitcher(session: session)
+                .layoutPriority(1)
         }
         .padding(.horizontal, 12)
         .frame(height: 34)
@@ -170,14 +173,29 @@ struct PathBar: View {
     }
 }
 
-/// Always-visible RAW / JPEG mode switch (+ RAW look when RAW files are shown on their own).
+/// Always-visible RAW / JPEG mode switch (+ burst stacks, + RAW look when RAW files are shown on their own).
+/// Picks the widest variant that fits, so it never pushes the window content off-screen.
 struct FileViewSwitcher: View {
     @Environment(AppModel.self) private var app
     let session: FolderSession
 
     var body: some View {
-        HStack(spacing: 8) {
-            Picker("", selection: Binding(get: { session.fileView }, set: { session.setFileView($0) })) {
+        ViewThatFits(in: .horizontal) {
+            bar(compact: false)
+            bar(compact: true)
+            menu
+        }
+    }
+
+    private var showsRawLook: Bool { session.fileView != .combined && session.fileView != .jpegOnly }
+
+    private var modeBinding: Binding<FileViewMode> { Binding(get: { session.fileView }, set: { session.setFileView($0) }) }
+    private var stackBinding: Binding<Bool> { Binding(get: { app.settings.stackBursts }, set: { app.setStackBursts($0) }) }
+    private var rawBinding: Binding<RawRendering> { Binding(get: { app.settings.rawRendering }, set: { app.setRawRendering($0) }) }
+
+    private func bar(compact: Bool) -> some View {
+        HStack(spacing: compact ? 6 : 8) {
+            Picker("", selection: modeBinding) {
                 ForEach(FileViewMode.allCases) { m in
                     Text(m.segmentTitle).tag(m).help("\(m.title) (⌥⌘\(String(m.shortcutKey)))")
                 }
@@ -187,16 +205,17 @@ struct FileViewSwitcher: View {
             .fixedSize()
             .help("RAW + JPEG as one photo · separately · JPEG only · RAW only (⌥⌘1–4)")
 
-            Toggle(isOn: Binding(get: { app.settings.stackBursts }, set: { app.setStackBursts($0) })) {
-                Label("Stacks", systemImage: "square.stack")
+            Toggle(isOn: stackBinding) {
+                if compact { Image(systemName: "square.stack") } else { Label("Stacks", systemImage: "square.stack") }
             }
             .toggleStyle(.button)
+            .fixedSize()
             .help("Group bursts into stacks (⇧S)")
 
-            if session.fileView != .combined && session.fileView != .jpegOnly {
-                Picker("", selection: Binding(get: { app.settings.rawRendering }, set: { app.setRawRendering($0) })) {
+            if showsRawLook {
+                Picker("", selection: rawBinding) {
                     Text("True RAW").tag(RawRendering.rendered)
-                    Text("Camera Preview").tag(RawRendering.embedded)
+                    Text(compact ? "Camera" : "Camera Preview").tag(RawRendering.embedded)
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -208,5 +227,32 @@ struct FileViewSwitcher: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
         .glassCapsule()
+        .fixedSize()
+    }
+
+    /// Narrowest variant: everything in one menu.
+    private var menu: some View {
+        Menu {
+            Picker("Show", selection: modeBinding) {
+                ForEach(FileViewMode.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.inline)
+            Toggle("Stack Bursts", isOn: stackBinding)
+            if showsRawLook {
+                Picker("RAW Look", selection: rawBinding) {
+                    Text("True RAW").tag(RawRendering.rendered)
+                    Text("Camera Preview").tag(RawRendering.embedded)
+                }
+                .pickerStyle(.inline)
+            }
+        } label: {
+            Label(session.fileView.segmentTitle, systemImage: "square.stack.3d.down.right")
+        }
+        .menuStyle(.borderlessButton)
+        .controlSize(.small)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .glassCapsule()
+        .fixedSize()
     }
 }

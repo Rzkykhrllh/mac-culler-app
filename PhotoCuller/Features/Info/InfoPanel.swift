@@ -60,7 +60,7 @@ struct InfoPanel: View {
                 ContentUnavailableView("No Photo", systemImage: "info.circle")
             }
         }
-        .frame(minWidth: 260)
+        .frame(maxWidth: .infinity)
     }
 
     @ViewBuilder private func row(_ title: String, _ value: String?) -> some View {

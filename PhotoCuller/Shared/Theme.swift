@@ -67,8 +67,9 @@ struct Chip: View {
     var body: some View {
         HStack(spacing: 4) {
             if let systemImage { Image(systemName: systemImage) }
-            Text(text).monospacedDigit()
+            Text(text).monospacedDigit().lineLimit(1)
         }
+        .fixedSize()
         .font(.caption.weight(.medium))
         .foregroundStyle(tint)
         .padding(.horizontal, 8)

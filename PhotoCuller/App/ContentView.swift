@@ -9,6 +9,7 @@ struct ContentView: View {
         NavigationSplitView(columnVisibility: $app.sidebarVisibility) {
             FolderSidebarView()
         } detail: {
+            HStack(spacing: 0) {
             VStack(spacing: 0) {
                 TabBar()
                 if let s = app.session {
@@ -26,18 +27,25 @@ struct ContentView: View {
                         }
                 }
             }
-            .appBackdrop()
-            // On the whole detail column, so tabs / path bar / mode switch shift left with the photos.
-            .inspector(isPresented: Binding(get: { app.session?.showInfoPanel ?? false },
-                                            set: { app.session?.showInfoPanel = $0 })) {
-                Group {
-                    if let s = app.session { InfoPanel(session: s) } else { Color.clear }
-                }
-                .inspectorColumnWidth(min: 260, ideal: 300, max: 420)
+            // The split view sizes the column from its content's *ideal* width (the widest ViewThatFits variant);
+            // a small explicit ideal lets the window shrink while the bars switch to their compact variants.
+            // Worst case still fits the 900 pt minimum window: sidebar ≤ 300 + info 260 + content ≥ 340.
+            .frame(minWidth: 340, idealWidth: 340, maxWidth: .infinity, maxHeight: .infinity)
+            // Info panel as a plain trailing column (SwiftUI's .inspector adds a nested split view with a
+            // large minimum width that pushed the layout off-screen in small windows).
+            if let s = app.session, s.showInfoPanel {
+                InfoPanel(session: s)
+                    .frame(width: 260)
+                    .background(.ultraThinMaterial)
+                    .overlay(alignment: .leading) { Rectangle().fill(Color.white.opacity(0.08)).frame(width: 1) }
+                    .transition(.move(edge: .trailing))
             }
+            }
+            .animation(.smooth(duration: 0.2), value: app.session?.showInfoPanel)
+            .appBackdrop()
         }
         .onAppear { app.activateRestoredTabIfNeeded() }
-        .frame(minWidth: 1000, minHeight: 620)
+        .frame(minWidth: 900, minHeight: 560)
         .background(WindowAccessor { window in
             KeyboardController.shared.mainWindow = window
             window.tabbingMode = .disallowed
@@ -181,33 +189,41 @@ struct StatusBar: View {
     var body: some View {
         let picks = session.items.values.filter { $0.metadata.flag == .pick }.count
         let rejects = session.items.values.filter { $0.metadata.flag == .reject }.count
+        // Secondary chips drop out first when the window is narrow.
+        ViewThatFits(in: .horizontal) {
+            row(picks: picks, rejects: rejects, compact: false)
+            row(picks: picks, rejects: rejects, compact: true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .glassCapsule()
+    }
+
+    private func row(picks: Int, rejects: Int, compact: Bool) -> some View {
         HStack(spacing: 8) {
             Chip(systemImage: "photo.on.rectangle", text: "\(session.matchingCount) of \(session.items.count)")
-            if session.display.count != session.matchingCount {
+            if !compact, session.display.count != session.matchingCount {
                 Chip(text: "\(session.display.count) shown")
             }
             if session.selection.count > 1 { Chip(systemImage: "checkmark.circle", text: "\(session.selection.count) selected", tint: Theme.accentStart) }
-            if session.includeSubfolders { Chip(systemImage: "folder.badge.plus", text: "Subfolders") }
-            if session.fileView != .combined { Chip(systemImage: "square.stack.3d.down.right", text: session.fileView.shortTitle) }
+            if !compact, session.includeSubfolders { Chip(systemImage: "folder.badge.plus", text: "Subfolders") }
+            if !compact, session.fileView != .combined { Chip(systemImage: "square.stack.3d.down.right", text: session.fileView.shortTitle) }
             if let p = session.indexing {
-                ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70).controlSize(.small)
-                Chip(text: "Indexing \(p.done)/\(p.total)")
+                ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: compact ? 40 : 70).controlSize(.small)
+                if !compact { Chip(text: "Indexing \(p.done)/\(p.total)") }
             }
             if let p = session.fileOperation {
                 ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70).controlSize(.small)
                 Chip(text: "\(p.title) \(p.done)/\(p.total)")
             }
-            Spacer()
+            Spacer(minLength: 8)
             if session.app.capsLockOn {
-                Chip(systemImage: "forward.fill", text: "Auto-advance", tint: Theme.accentStart)
+                Chip(systemImage: "forward.fill", text: compact ? "Auto" : "Auto-advance", tint: Theme.accentStart)
                     .help("Caps Lock is on: marking moves to the next photo")
             }
             Chip(systemImage: "flag.fill", text: "\(picks)", tint: .white).help("Picks")
             Chip(systemImage: "xmark.circle.fill", text: "\(rejects)", tint: .red.opacity(0.9)).help("Rejects")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .glassCapsule()
     }
 }
 
