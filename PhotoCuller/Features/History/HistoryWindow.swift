@@ -45,6 +45,7 @@ struct HistoryWindow: View {
         case .rename: return "pencil"
         case .move: return "folder"
         case .copy: return "doc.on.doc"
+        case .trash: return "trash"
         }
     }
 

@@ -42,6 +42,12 @@ struct PhotoCullerApp: App {
                                 await DebugSelfTest.runSimilarity(app.session!)
                             }
                         }
+                        if args.contains("-trashTest") {
+                            Task {
+                                while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
+                                await DebugSelfTest.runTrash(app.session!)
+                            }
+                        }
                         if args.contains("-selfTest") {
                             Task {
                                 while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
@@ -142,6 +148,7 @@ struct ShortcutsHelpView: View {
                 row("Reverse sort order", "⌃⌘R")
                 row("Compare with 2 / 3 / 4 slots", "⌥2 / ⌥3 / ⌥4")
                 row("Move… / Copy…", "⇧⌘M / ⇧⌘C")
+                row("Move to Trash / all rejects to Trash", "⌘⌫ / ⇧⌘⌫")
                 row("Reveal in Finder", "⇧⌘R")
                 row("Find / clear filters", "⌘F / ⌥⌘F")
                 row("Thumbnail size", "⌘= / ⌘−")

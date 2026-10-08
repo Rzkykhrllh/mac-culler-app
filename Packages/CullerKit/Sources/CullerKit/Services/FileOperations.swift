@@ -150,6 +150,40 @@ public enum FileOperations {
         }
     }
 
+    // MARK: Trash
+
+    /// Moves a file to the Trash and returns where it went. Injectable so tests never touch the real Trash.
+    public typealias Trasher = @Sendable (URL) throws -> URL
+
+    public static let systemTrash: Trasher = { url in
+        var result: NSURL?
+        try FileManager.default.trashItem(at: url, resultingItemURL: &result)
+        guard let r = result as URL? else { throw FileOperationError.sourceMissing(url) }
+        return r
+    }
+
+    /// Moves every file of each item (images + sidecar) to the Trash — never a permanent delete.
+    /// Per item all-or-nothing: if one file fails, the item's files already trashed are put back.
+    public static func trash(_ items: [(itemID: String, files: ItemFiles)], trasher: Trasher = systemTrash) -> TransferResult {
+        let fm = FileManager.default
+        var result = TransferResult()
+        for item in items {
+            var moves: [FileMove] = []
+            do {
+                for url in item.files.allURLs {
+                    guard fm.fileExists(atPath: url.path) else { throw FileOperationError.sourceMissing(url) }
+                    moves.append(FileMove(from: url, to: try trasher(url)))
+                }
+                result.completed.append(ItemPlan(itemID: item.itemID, oldBaseName: item.files.baseName,
+                                                 proposedBaseName: item.files.baseName, newBaseName: item.files.baseName, moves: moves))
+            } catch {
+                for m in moves.reversed() { try? fm.moveItem(at: m.to, to: m.from) }
+                result.failed.append((item.itemID, error.localizedDescription))
+            }
+        }
+        return result
+    }
+
     // MARK: Move / copy
 
     public static func planTransfer(_ items: [(itemID: String, files: ItemFiles)], to destination: URL) -> [ItemPlan] {

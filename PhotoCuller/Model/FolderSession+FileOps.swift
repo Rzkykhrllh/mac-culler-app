@@ -128,6 +128,72 @@ extension FolderSession {
 
     func cancelFileOperation() { currentCancel?.cancel() }
 
+    // MARK: Move to Trash
+
+    /// ⌘⌫: the photos marks would apply to (selection / current / active compare slot).
+    func trashSelection() {
+        confirmAndTrash(markTargets, rejectsOnly: false)
+    }
+
+    /// ⇧⌘⌫: every rejected photo of this folder (in the current RAW/JPG mode), collapsed stacks included.
+    func trashRejects() {
+        let rejects = items.values.filter { $0.metadata.flag == .reject && fileView.shows($0.files) }
+            .sorted { $0.captureDate < $1.captureDate }
+        guard !rejects.isEmpty else { return showToast("No rejected photos here") }
+        confirmAndTrash(rejects, rejectsOnly: true)
+    }
+
+    private func confirmAndTrash(_ targets: [PhotoItem], rejectsOnly: Bool) {
+        guard !targets.isEmpty else { return }
+        let files = targets.reduce(0) { $0 + $1.files.allURLs.count }
+        let noun = targets.count == 1 ? "photo" : "photos"
+        let a = NSAlert()
+        a.alertStyle = .warning
+        a.messageText = rejectsOnly ? "Move \(targets.count) rejected \(noun) to the Trash?" :
+            (targets.count == 1 ? "Move “\(targets[0].fileName)” to the Trash?" : "Move \(targets.count) \(noun) to the Trash?")
+        var info = "\(files) file\(files == 1 ? "" : "s") — every file of each photo (RAW, paired JPG, .xmp sidecar) goes together."
+        if !fileView.pairs { info = "\(files) file\(files == 1 ? "" : "s"). In this mode RAW and JPG are separate: only the files shown are moved." }
+        a.informativeText = info + " Nothing is deleted permanently: ⌘Z (or the Trash in Finder) brings them back."
+        let ok = a.addButton(withTitle: "Move to Trash")
+        ok.hasDestructiveAction = true
+        a.addButton(withTitle: "Cancel")
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        Task { await trash(targets) }
+    }
+
+    func trash(_ targets: [PhotoItem]) async {
+        await app.writeQueue.flush()
+        let list = targets.map { (itemID: $0.id, files: $0.files) }
+        let trasher = app.operationLog.trasher
+        let result = await Task.detached(priority: .userInitiated) { FileOperations.trash(list, trasher: trasher) }.value
+        if !result.completed.isEmpty {
+            let record = OperationRecord.make(kind: .trash, plans: result.completed, folderBookmarks: [Bookmarks.make(for: folder)].compactMap { $0 })
+            app.operationLog.record(record)
+            app.historyChanged()
+            pushUndo(.fileOperation(record.id))
+            let gone = Set(result.completed.map(\.itemID))
+            let oldIndex = currentIndex
+            for id in gone { items[id] = nil }
+            selection.subtract(gone)
+            compare.slots = compare.slots.map { $0.flatMap { gone.contains($0) ? nil : $0 } }
+            compare.candidates.removeAll { gone.contains($0) }
+            if let c = currentID, gone.contains(c) { currentID = nil }
+            rebuildStacks()
+            rebuildDisplay()
+            if currentID == nil, let oldIndex, !display.isEmpty {
+                currentID = display[min(oldIndex, display.count - 1)].itemID
+                selection = [currentID!]
+            }
+            let n = result.completed.count
+            showToast("Moved \(n) photo\(n == 1 ? "" : "s") to the Trash · ⌘Z to undo")
+            scheduleRefresh(delay: .milliseconds(300))
+        }
+        if !result.failed.isEmpty {
+            app.alert = AppAlert(title: "\(result.failed.count) photo\(result.failed.count == 1 ? "" : "s") could not be moved to the Trash",
+                                 message: result.failed.prefix(5).map { "\(($0.itemID as NSString).lastPathComponent): \($0.error)" }.joined(separator: "\n"))
+        }
+    }
+
     private func isInsideFolder(_ url: URL) -> Bool {
         let a = url.standardizedFileURL.path, f = folder.standardizedFileURL.path
         return includeSubfolders ? (a == f || a.hasPrefix(f + "/")) : a == f
@@ -168,6 +234,9 @@ extension FolderSession {
             let a = NSAlert()
             a.messageText = undo ? "Can’t undo “\(rec.summary)”" : "Can’t redo “\(rec.summary)”"
             a.informativeText = error.localizedDescription
+            if undo && rec.kind == .trash {
+                a.informativeText += "\n\nThe files are still in the Trash: open it in Finder, right-click them and choose Put Back."
+            }
             a.runModal()
             return false
         }

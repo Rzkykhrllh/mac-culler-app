@@ -3,13 +3,14 @@ import Foundation
 /// A completed file operation as recorded in the persistent log (spec §8.4).
 public struct OperationRecord: Codable, Equatable, Identifiable, Sendable {
     public enum Kind: String, Codable, Sendable {
-        case rename, move, copy
+        case rename, move, copy, trash
 
         public var title: String {
             switch self {
             case .rename: return "Rename"
             case .move: return "Move"
             case .copy: return "Copy"
+            case .trash: return "Move to Trash"
             }
         }
     }
@@ -37,6 +38,7 @@ public struct OperationRecord: Codable, Equatable, Identifiable, Sendable {
         case .rename: return "Renamed \(itemCount) \(noun)"
         case .move: return "Moved \(itemCount) \(noun) to \(destinationName)"
         case .copy: return "Copied \(itemCount) \(noun) to \(destinationName)"
+        case .trash: return "Moved \(itemCount) \(noun) to the Trash"
         }
     }
 
@@ -83,6 +85,8 @@ public final class OperationLog: @unchecked Sendable {
     }
 
     public let url: URL
+    /// Used when redoing a "Move to Trash" (tests inject a fake).
+    public var trasher: FileOperations.Trasher = FileOperations.systemTrash
     private let lock = NSLock()
     private var records: [OperationRecord] = []
 
@@ -119,8 +123,11 @@ public final class OperationLog: @unchecked Sendable {
             guard let l = try? Self.decoder.decode(Line.self, from: Data(line.utf8)) else { continue }
             switch l {
             case .operation(let r):
-                byID[r.id] = out.count
-                out.append(r)
+                // A later line with the same id replaces it (redo of a trash records the new Trash paths).
+                if let i = byID[r.id] { out[i] = r } else {
+                    byID[r.id] = out.count
+                    out.append(r)
+                }
             case .state(let id, let undone):
                 if let i = byID[id] { out[i].undone = undone }
             }
@@ -190,6 +197,14 @@ public final class OperationLog: @unchecked Sendable {
         return nil
     }
 
+    /// Redo of a trash: the files must be back where they were, unchanged.
+    func verifyRedoTrash(_ r: OperationRecord) -> UndoError? {
+        for e in r.entries {
+            if let err = Self.check(path: e.from, size: e.size, mtime: e.mtime) { return err }
+        }
+        return nil
+    }
+
     // MARK: Undo / redo
 
     /// Reverts an operation after verifying it. Undoing a copy moves the copies to the Trash.
@@ -197,7 +212,8 @@ public final class OperationLog: @unchecked Sendable {
         if let err = verifyUndo(r) { throw err }
         let fm = FileManager.default
         switch r.kind {
-        case .rename, .move:
+        case .rename, .move, .trash:
+            // Undoing a trash puts the files back from the Trash.
             let moves = r.entries.map { FileMove(from: URL(fileURLWithPath: $0.to), to: URL(fileURLWithPath: $0.from)) }
             do { try FileOperations.executeTwoPhase(moves) } catch { throw UndoError.failed(error.localizedDescription) }
         case .copy:
@@ -211,9 +227,29 @@ public final class OperationLog: @unchecked Sendable {
     }
 
     public func redo(_ r: OperationRecord) throws {
-        if let err = verifyRedo(r) { throw err }
+        if let err = r.kind == .trash ? verifyRedoTrash(r) : verifyRedo(r) { throw err }
         let fm = FileManager.default
         switch r.kind {
+        case .trash:
+            // Trash again; the files land at new Trash paths, so the record is rewritten with them.
+            var updated = r
+            var done: [(Int, URL)] = []
+            do {
+                for (i, e) in r.entries.enumerated() {
+                    let to = try trasher(URL(fileURLWithPath: e.from))
+                    done.append((i, to))
+                }
+            } catch {
+                for (i, to) in done.reversed() { try? fm.moveItem(at: to, to: URL(fileURLWithPath: r.entries[i].from)) }
+                throw UndoError.failed(error.localizedDescription)
+            }
+            for (i, to) in done { updated.entries[i].to = to.path }
+            updated.undone = false
+            lock.withLock {
+                if let k = records.firstIndex(where: { $0.id == r.id }) { records[k] = updated }
+                append(.operation(updated))
+            }
+            return
         case .rename, .move:
             let moves = r.entries.map { FileMove(from: URL(fileURLWithPath: $0.from), to: URL(fileURLWithPath: $0.to)) }
             do { try FileOperations.executeTwoPhase(moves) } catch { throw UndoError.failed(error.localizedDescription) }

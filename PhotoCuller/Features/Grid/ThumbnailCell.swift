@@ -303,12 +303,6 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         controlRects = []
         tips = []
 
-        // Collapsed stack: a second card peeking out behind.
-        if entry?.isCollapsedStack == true {
-            NSColor(white: 1, alpha: 0.06).setFill()
-            NSBezierPath(roundedRect: b.insetBy(dx: 5, dy: 0).offsetBy(dx: 0, dy: -3), xRadius: radius, yRadius: radius).fill()
-        }
-
         // Card fill: quiet by default, brighter on hover / selection; stack members share a warm tint.
         var fill = NSColor(white: 1, alpha: 0.045)
         if case .stackMember = entry?.kind { fill = Theme.nsAccentStart.withAlphaComponent(0.07) }
@@ -317,11 +311,53 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         fill.setFill()
         card.fill()
 
+        // Cards peeking out behind the photo: a pile for a collapsed stack (A), a RAW card behind the JPG of a pair (E).
+        var stackTotal = 0
+        if case .collapsedStack(_, let t) = entry?.kind { stackTotal = t }
+        let isPile = stackTotal > 1
+        let isPairCard = !isPile && item?.files.isPair == true
+        let layers = isPile ? (stackTotal >= 3 ? 2 : 1) : (isPairCard ? 1 : 0)
+        let step: CGFloat = compact ? 4 : 8
+        var area = b.insetBy(dx: compact ? 4 : 6, dy: compact ? 4 : 6)
+        if layers > 0 {
+            let inset = step * CGFloat(layers)
+            area = NSRect(x: area.minX, y: area.minY + inset, width: area.width - inset, height: area.height - inset)
+        }
+
+        // Photo rect (placeholder shape while loading).
+        let r = image.map { aspectFit(CGSize(width: $0.width, height: $0.height), in: area) }
+            ?? area.insetBy(dx: area.width * 0.12, dy: area.height * 0.18)
+        let corner: CGFloat = compact ? 3 : 5
+        if layers > 0 {
+            for i in stride(from: layers, through: 1, by: -1) {
+                let back = r.offsetBy(dx: step * CGFloat(i), dy: -step * CGFloat(i))
+                let path = NSBezierPath(roundedRect: back, xRadius: corner, yRadius: corner)
+                if isPairCard {
+                    NSColor(calibratedRed: 0.40, green: 0.43, blue: 0.48, alpha: 1).setFill()
+                } else {
+                    NSColor(white: i == 1 ? 0.40 : 0.28, alpha: 1).setFill()
+                }
+                ctx.saveGState()
+                ctx.setShadow(offset: CGSize(width: 0, height: 1), blur: 3, color: NSColor(white: 0, alpha: 0.4).cgColor)
+                path.fill()
+                ctx.restoreGState()
+                NSColor(white: 1, alpha: 0.14).setStroke()
+                path.lineWidth = 0.75
+                path.stroke()
+                tips.append((back, isPairCard
+                    ? "RAW+JPG: this shot has a RAW file behind the JPEG you see. Marks apply to both files."
+                    : "Stack of \(stackTotal) photos taken together — S or double-click to expand."))
+                if isPairCard && !compact && r.width > 70 {
+                    // "RAW" tab on the back card's top-right corner.
+                    let tab = pill(text: "RAW", at: NSPoint(x: back.maxX + 2, y: back.minY - 7), alignRight: true,
+                                   fill: NSColor(calibratedRed: 0.27, green: 0.29, blue: 0.33, alpha: 0.96))
+                    tips.append((tab, "RAW+JPG: a RAW file and a JPEG of the same shot, shown as one photo. Marks apply to both files."))
+                }
+            }
+        }
+
         // Photo, with a soft shadow, as large as the card allows.
-        let area = b.insetBy(dx: compact ? 4 : 6, dy: compact ? 4 : 6)
-        let r: NSRect
         if let image {
-            r = aspectFit(CGSize(width: image.width, height: image.height), in: area)
             let path = CGPath(roundedRect: r, cornerWidth: compact ? 3 : 5, cornerHeight: compact ? 3 : 5, transform: nil)
             ctx.saveGState()
             ctx.setShadow(offset: CGSize(width: 0, height: 2), blur: 6, color: NSColor(white: 0, alpha: 0.5).cgColor)
@@ -340,7 +376,6 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
             ctx.restoreGState()
         } else {
             // Loading placeholder.
-            r = area.insetBy(dx: area.width * 0.12, dy: area.height * 0.18)
             NSColor(white: 1, alpha: 0.04).setFill()
             NSBezierPath(roundedRect: r, xRadius: 6, yRadius: 6).fill()
             if item?.decodeFailed == true {
@@ -410,7 +445,7 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
             tips.append((sr, "Sharpest frame of this stack (B jumps here). A hint — you decide."))
         }
         // Top-right: RAW+JPG pair, or the broken-chain cue of a separated pair; compare slot.
-        if let item, item.files.isPair, !compact, r.width > 120 {
+        if let item, item.files.isPair, isPile, !compact, r.width > 90 {
             let pr = pill(text: item.files.badge, at: NSPoint(x: r.maxX - pad, y: r.minY + pad), alignRight: true)
             tips.append((pr, "\(item.files.badge): a RAW file and a JPEG of the same shot, shown as one photo. Marks apply to both files."))
         } else if let partner = partnerName, let item {

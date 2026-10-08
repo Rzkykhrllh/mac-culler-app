@@ -10,6 +10,8 @@ struct AppCommands: Commands {
 
     private var session: FolderSession? { app.session }
     private var canAct: Bool { session?.phase == .ready && session?.activeSheet == nil && session?.editingNote == nil }
+    /// Destructive commands also stay off while typing (⌘⌫ deletes text there).
+    private var canTrash: Bool { canAct && !KeyboardController.isEditingText }
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -49,6 +51,14 @@ struct AppCommands: Commands {
             Button("Copy…") { session?.activeSheet = .copy }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(!canAct)
+            Divider()
+            Button("Move to Trash…") { session?.trashSelection() }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(!canTrash)
+            Button("Move Rejects to Trash…") { session?.trashRejects() }
+                .keyboardShortcut(.delete, modifiers: [.command, .shift])
+                .disabled(!canTrash)
+            Divider()
             Button("Reveal in Finder") {
                 if let s = session { NSWorkspace.shared.activateFileViewerSelecting(s.markTargets.flatMap(\.files.allURLs)) }
             }
