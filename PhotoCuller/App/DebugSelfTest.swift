@@ -546,6 +546,60 @@ enum DebugSelfTest {
         Log.session.info("SCROLLTEST done")
     }
 
+    /// `-modeTest`: grid ↔ loupe must keep pointing at the same photo, and the grid must show it.
+    static func runModeSwitch(_ s: FolderSession) async {
+        while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        let savedStacks = s.settings.stackBursts
+        defer { s.settings.stackBursts = savedStacks; s.regroup() }
+        s.settings.stackBursts = false
+        s.regroup()
+        Log.session.info("MODETEST \(s.display.count) photos shown, filter active \(s.filter.isActive), mode \(s.fileView.rawValue)")
+        guard let w = KeyboardController.shared.mainWindow, let content = w.contentView else { return }
+        let savedSize = s.settings.thumbnailSize
+        defer { s.settings.thumbnailSize = savedSize }
+        s.settings.thumbnailSize = 200
+        w.setContentSize(NSSize(width: 1300, height: 820))
+        s.viewMode = .grid
+        try? await Task.sleep(for: .seconds(2))
+        func name(_ id: ItemID?) -> String { id.map { ($0 as NSString).lastPathComponent } ?? "nil" }
+        func cells(_ v: NSView) -> [ThumbnailCellView] { (v as? ThumbnailCellView).map { [$0] } ?? v.subviews.flatMap(cells) }
+        func gridShowsCurrent() -> String {
+            let ring = cells(content).filter { $0.isCurrent && $0.window != nil && $0.visibleRect.height > 40 }.compactMap { $0.item?.id }
+            return ring.map(name).joined(separator: ",")
+        }
+        func check(_ ok: Bool, _ what: String) { Log.session.info("MODETEST \(ok ? "ok  " : "FAIL", privacy: .public) \(what, privacy: .public)") }
+        guard s.display.count > 15 else { return check(false, "needs > 25 photos (\(s.display.count))") }
+
+        // 1. Click a photo far down in the grid, open the loupe.
+        let target = s.display[s.display.count - 1 - 13].itemID
+        s.select(target); s.selectionAnchor = target
+        try? await Task.sleep(for: .milliseconds(800))
+        check(gridShowsCurrent() == name(target), "grid scrolled to the selected photo (\(gridShowsCurrent()))")
+        s.viewMode = .loupe
+        try? await Task.sleep(for: .milliseconds(800))
+        check(s.currentID == target, "loupe opens on it (\(name(s.currentID)))")
+
+        // 2. Browse in the loupe, back to the grid.
+        s.move(5)
+        let browsed = s.currentID
+        try? await Task.sleep(for: .milliseconds(500))
+        s.viewMode = .grid
+        try? await Task.sleep(for: .milliseconds(1200))
+        check(s.currentID == browsed, "grid keeps the photo browsed in the loupe (\(name(s.currentID)) vs \(name(browsed)))")
+        check(s.selection == Set([browsed].compactMap { $0 }), "selection is that photo (\(s.selection.map(name).sorted()))")
+        check(gridShowsCurrent() == name(browsed), "grid scrolled to it, ring visible (\(gridShowsCurrent()))")
+
+        // 3. Again, far away (the loupe filmstrip moved a lot).
+        s.viewMode = .loupe
+        try? await Task.sleep(for: .milliseconds(600))
+        for _ in 0..<12 { s.move(-1) }
+        let back = s.currentID
+        s.viewMode = .grid
+        try? await Task.sleep(for: .milliseconds(1200))
+        check(s.currentID == back && gridShowsCurrent() == name(back), "second round trip (\(name(s.currentID)), ring \(gridShowsCurrent()))")
+        Log.session.info("MODETEST done")
+    }
+
     static func run(_ s: FolderSession) async {
         var failures: [String] = []
         func check(_ ok: Bool, _ what: String) {

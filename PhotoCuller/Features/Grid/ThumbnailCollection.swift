@@ -81,6 +81,9 @@ struct ThumbnailCollection: NSViewRepresentable {
         private var style: Style?
         private var lastCurrent: ItemID?
         private var lastWidth: CGFloat = 0
+        /// A freshly created grid / strip (e.g. back from the loupe) must bring the current photo into view, but
+        /// can only do so once it has a size and a layout; until then the request waits here.
+        private var pendingReveal = false
         private var syncing = false
         private var prefetchTasks: [IndexPath: Task<Void, Never>] = [:]
         /// Separate RAW/JPEG mode: the other file of every selected photo gets a dashed outline
@@ -140,7 +143,20 @@ struct ThumbnailCollection: NSViewRepresentable {
                 }
             } else if p.currentID != lastCurrent || force {
                 lastCurrent = p.currentID
-                scrollToCurrent(cv)
+                if force { pendingReveal = true } else { scrollToCurrent(cv) }
+            }
+            revealIfPending()
+        }
+
+        /// Centers the current photo once the view is laid out (called from apply and on every resize).
+        private func revealIfPending() {
+            guard pendingReveal, let cv = collectionView, let sv = cv.enclosingScrollView,
+                  sv.contentSize.width > 50, sv.contentSize.height > 50 else { return }
+            pendingReveal = false
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let cv = self.collectionView, let id = self.parent.currentID, let ip = self.indexPath(of: id) else { return }
+                cv.layoutSubtreeIfNeeded()
+                cv.scrollToItems(at: [ip], scrollPosition: self.parent.style.isStrip ? .centeredHorizontally : .centeredVertically)
             }
         }
 
@@ -173,10 +189,12 @@ struct ThumbnailCollection: NSViewRepresentable {
                 let inner = h - 2 * ThumbnailCollection.inset
                 size = NSSize(width: floor(inner * 1.25), height: inner)
             }
-            guard layout.itemSize != size else { return }
-            layout.itemSize = size
-            layout.invalidateLayout()
-            for case let cell as ThumbnailCell in cv.visibleItems() { cell.view.needsDisplay = true }
+            if layout.itemSize != size {
+                layout.itemSize = size
+                layout.invalidateLayout()
+                for case let cell as ThumbnailCell in cv.visibleItems() { cell.view.needsDisplay = true }
+            }
+            revealIfPending()
         }
 
         private func indexPath(of id: ItemID) -> IndexPath? {
