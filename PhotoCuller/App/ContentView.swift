@@ -183,12 +183,7 @@ struct SessionToolbar: ToolbarContent {
                 .disabled(!session.canRedo)
                 .help(session.canRedo ? "Redo \(session.redoStack.last!.title) (⇧⌘Z)" : "Nothing to redo (⇧⌘Z)")
         }
-        ToolbarItem(placement: .principal) {
-            ChoiceBar(options: ViewMode.allCases.map { .init(value: $0, title: $0.title, symbol: $0.symbol, help: Explain.viewMode($0)) },
-                      selection: Binding(get: { session.viewMode }, set: { m in
-                          if m == .compare { session.enterCompare() } else { session.viewMode = m }
-                      }), compact: true)
-        }
+        ViewModeToolbarItem(session: session)
         ToolbarItemGroup(placement: .primaryAction) {
             if session.writeFailures > 0 {
                 Button { session.retryFailedWrites() } label: {
@@ -215,6 +210,28 @@ struct SessionToolbar: ToolbarContent {
             .help("Filter bar (⌘F)")
             Toggle(isOn: $session.showInfoPanel) { Label("Info", systemImage: "info.circle") }
                 .help("Info panel (I)")
+        }
+    }
+}
+
+/// Grid / Loupe / Compare in the middle of the toolbar.
+struct ViewModeToolbarItem: ToolbarContent {
+    let session: FolderSession
+
+    private var bar: some View {
+        ChoiceBar(options: ViewMode.allCases.map { .init(value: $0, title: $0.title, symbol: $0.symbol, help: Explain.viewMode($0)) },
+                  selection: Binding(get: { session.viewMode }, set: { m in
+                      if m == .compare { session.enterCompare() } else { session.viewMode = m }
+                  }), toolbar: true)
+    }
+
+    var body: some ToolbarContent {
+        if #available(macOS 26.0, *) {
+            // The control draws its own capsule; the system's item glass around it made a double frame.
+            ToolbarItem(placement: .principal) { bar }
+                .sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem(placement: .principal) { bar }
         }
     }
 }

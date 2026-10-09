@@ -14,8 +14,44 @@ struct ChoiceBar<T: Hashable>: View {
     @Binding var selection: T
     /// Icons only (when an option has a symbol).
     var compact = false
+    /// Toolbar look: equal icon segments in one glass capsule (the toolbar's own item background is hidden,
+    /// so there is exactly one container and the selected pill has the same margin on every side).
+    var toolbar = false
 
     var body: some View {
+        if toolbar { toolbarBar } else { inlineBar }
+    }
+
+    private var toolbarBar: some View {
+        HStack(spacing: 2) {
+            ForEach(options.indices, id: \.self) { i in
+                let o = options[i]
+                let selected = o.value == selection
+                Button {
+                    selection = o.value
+                } label: {
+                    Image(systemName: o.symbol ?? "circle")
+                        .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                        .foregroundStyle(selected ? Color.black.opacity(0.85) : Color.primary.opacity(0.75))
+                        .frame(width: 34, height: 24)
+                        .background {
+                            if selected { Capsule().fill(Theme.accent) }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(o.help)
+                .accessibilityLabel(o.title.isEmpty ? o.help : o.title)
+            }
+        }
+        .padding(3)
+        .glassCapsule()
+        .overlay(Capsule().strokeBorder(Color.white.opacity(0.09), lineWidth: 1))
+        .fixedSize()
+        .animation(.smooth(duration: 0.15), value: selection)
+    }
+
+    private var inlineBar: some View {
         HStack(spacing: 2) {
             ForEach(options.indices, id: \.self) { i in
                 let o = options[i]
