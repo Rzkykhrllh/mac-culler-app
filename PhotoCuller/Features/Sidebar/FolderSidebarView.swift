@@ -8,7 +8,9 @@ struct FolderSidebarView: View {
 
     var body: some View {
         let sidebar = app.sidebar
-        List(selection: Binding(get: { sidebar.selectedURL }, set: { _ in })) {
+        // No List selection: its system-blue highlight followed clicks on its own and could sit on a different row
+        // than the folder actually open. The open folder is marked by the row itself (accent pill), once.
+        List {
             if !sidebar.pinned.isEmpty {
                 Section("Pinned") {
                     ForEach(sidebar.pinned) { FolderRow(node: $0, isRoot: true) }
@@ -70,7 +72,9 @@ private struct FolderRow: View {
             Image(systemName: isOpen && node.symbol == "folder" ? "folder.fill" : node.symbol)
                 .foregroundStyle(isOpen ? AnyShapeStyle(Theme.accent) : AnyShapeStyle(.secondary))
                 .frame(width: 18)
-            Text(node.name).lineLimit(1)
+            Text(node.name)
+                .lineLimit(1)
+                .fontWeight(isOpen ? .semibold : .regular)
             Spacer(minLength: 4)
             if node.needsAccess {
                 Image(systemName: "lock.fill").font(.caption2).foregroundStyle(.tertiary)
@@ -78,13 +82,23 @@ private struct FolderRow: View {
             } else if let n = node.photoCount, n > 0 {
                 Text("\(n)")
                     .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isOpen ? .primary : .secondary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
-                    .background(Color.white.opacity(0.08), in: Capsule())
+                    .background(isOpen ? Theme.accentStart.opacity(0.28) : Color.white.opacity(0.08), in: Capsule())
             }
         }
-        .tag(node.url)
+        // Room on both ends, so the count never touches the highlight's edge.
+        .padding(.leading, 4)
+        .padding(.trailing, 8)
+        .padding(.vertical, 3)
+        .background {
+            if isOpen {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Theme.accentStart.opacity(0.16))
+                    .overlay(RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(Theme.accentStart.opacity(0.25)))
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture { open(newTab: NSEvent.modifierFlags.contains(.command)) }
         .help(node.url.path)
