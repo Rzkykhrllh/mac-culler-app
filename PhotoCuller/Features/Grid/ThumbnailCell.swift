@@ -414,7 +414,8 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         let pad: CGFloat = compact ? 3 : 5
         let showHoverBar = isHovered && !compact && image != nil && r.width > 110
 
-        // The other file of a selected photo (separate RAW/JPEG mode): white dashed outline + PAIR tag.
+        // The other file of a selected photo (separate RAW/JPEG mode): white dashed outline; its type badge
+        // (top right) turns white and reads "PAIR · JPG".
         // Deliberately not orange: orange always means "pointer / selected".
         if isPartnerHighlighted && !isCurrent && !isSelectedCell {
             let dashed = NSBezierPath(roundedRect: b.insetBy(dx: 1.5, dy: 1.5), xRadius: radius, yRadius: radius)
@@ -422,17 +423,6 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
             dashed.setLineDash([7, 5], count: 2, phase: 0)
             NSColor(white: 1, alpha: 0.8).setStroke()
             dashed.stroke()
-            if r.width > 70 {
-                let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: compact ? 8 : 9, weight: .bold),
-                                                            .foregroundColor: NSColor.black, .kern: 0.6]
-                let t = NSAttributedString(string: "PAIR", attributes: attrs)
-                let ts = t.size()
-                let tag = NSRect(x: b.midX - ts.width / 2 - 6, y: b.minY - 1, width: ts.width + 12, height: ts.height + 4)
-                NSColor(white: 1, alpha: 0.9).setFill()
-                NSBezierPath(roundedRect: tag, xRadius: tag.height / 2, yRadius: tag.height / 2).fill()
-                t.draw(at: NSPoint(x: tag.minX + 6, y: tag.minY + 2))
-                tips.append((tag, "The other file of the selected photo (same shot)"))
-            }
         }
 
         // Top-left: flag, sharpest.
@@ -458,9 +448,15 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
             tips.append((pr, "\(item.files.badge): a RAW file and a JPEG of the same shot, shown as one photo. Marks apply to both files."))
         } else if let partner = partnerName, let item {
             let kind = item.files.primary.kind.isRaw ? "RAW" : "JPG"
-            let pr = pill(text: compact ? nil : kind, symbol: "personalhotspot.slash", color: Theme.nsAccentStart,
-                          at: NSPoint(x: r.maxX - pad, y: r.minY + pad), alignRight: true)
-            tips.append((pr, "Separated pair: the other file of this shot is \(partner). Hover to see it outlined; switch to RAW+JPG to treat them as one photo."))
+            if isPartnerHighlighted && !isCurrent && !isSelectedCell {
+                let pr = pill(text: compact ? nil : "PAIR · \(kind)", symbol: "link", color: .black, textColor: .black,
+                              at: NSPoint(x: r.maxX - pad, y: r.minY + pad), alignRight: true, fill: NSColor(white: 1, alpha: 0.92))
+                tips.append((pr, "The other file of the selected photo (\(partner)): same shot, shown separately."))
+            } else {
+                let pr = pill(text: compact ? nil : kind, symbol: "personalhotspot.slash", color: Theme.nsAccentStart,
+                              at: NSPoint(x: r.maxX - pad, y: r.minY + pad), alignRight: true)
+                tips.append((pr, "Separated pair: the other file of this shot is \(partner). Select this photo to see it outlined; switch to RAW+JPG to treat them as one photo."))
+            }
         }
         if let s = compareSlot {
             pill(text: ["L", "R", "3", "4"][min(s, 3)], at: NSPoint(x: r.midX - 8, y: r.minY + pad), fill: Theme.nsAccentEnd)
@@ -514,11 +510,11 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
 
     /// Small dark rounded pill with an optional symbol and text. Returns its rect.
     @discardableResult
-    private func pill(text: String? = nil, symbol: String? = nil, color: NSColor = .white, at p: NSPoint, alignRight: Bool = false,
-                      fill: NSColor = NSColor(white: 0.08, alpha: 0.72)) -> NSRect {
+    private func pill(text: String? = nil, symbol: String? = nil, color: NSColor = .white, textColor: NSColor = .white, at p: NSPoint,
+                      alignRight: Bool = false, fill: NSColor = NSColor(white: 0.08, alpha: 0.72)) -> NSRect {
         let h = pillHeight
         let font = NSFont.systemFont(ofSize: compact ? 8.5 : 10, weight: .semibold)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: textColor]
         let textSize = text.map { ($0 as NSString).size(withAttributes: attrs) } ?? .zero
         let img = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: compact ? 7.5 : 9, weight: .bold).applying(.init(paletteColors: [color]))) }

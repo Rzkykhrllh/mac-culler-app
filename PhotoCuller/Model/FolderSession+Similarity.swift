@@ -6,7 +6,7 @@ extension FolderSession {
     /// Makes sure every shown photo has a feature print when grouping by similarity: cached ones come from the
     /// index, the rest are computed in the background (≈130 photos/s on an M2) and regrouped as they arrive.
     func ensureFeaturePrints() {
-        guard settings.stackBursts, settings.groupingMode == .similarity, phase == .ready, similarityTask == nil else { return }
+        guard settings.stackBursts, settings.groupingMode == .similarity, phase == .ready, similarityTask == nil, !backgroundPaused else { return }
         let mode = fileView
         let missing = items.values.filter { featurePrints[$0.id] == nil && mode.shows($0.files) }
             .sorted { $0.captureDate < $1.captureDate }
@@ -57,7 +57,7 @@ extension FolderSession {
                     self.featurePrints[chunk[i].id] = o
                     stored.append((chunk[i].files.primary, d))
                 }
-                Task.detached(priority: .background) { index.storeFeaturePrints(stored) }
+                index.enqueue { [stored] in $0.storeFeaturePrints(stored) }
                 done += chunk.count
                 if self.shouldPublishProgress("similarity") { self.similarityProgress = (done, missing.count) }
                 if Date().timeIntervalSince(lastRegroup) > 1.5 {

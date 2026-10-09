@@ -20,7 +20,14 @@ final class AppModel {
 
     // Tabs
     private(set) var tabs: [WorkspaceTab] = []
-    private(set) var activeTabID: UUID
+    private(set) var activeTabID: UUID {
+        didSet {
+            guard oldValue != activeTabID else { return }
+            // Only the visible tab indexes / analyzes; the others pick up where they left off when shown.
+            tabs.first { $0.id == oldValue }?.session?.pauseBackgroundWork()
+            activeTab.session?.resumeBackgroundWork()
+        }
+    }
     @ObservationIgnored private var closedFolders: [URL] = []
     /// Off for DEBUG launches with `-openFolder`, so development runs never replace the user's saved tabs.
     @ObservationIgnored var persistsTabs = true

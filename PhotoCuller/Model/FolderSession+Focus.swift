@@ -34,7 +34,7 @@ extension FolderSession {
     }
 
     func ensureAnalysis() {
-        guard phase == .ready, analysisTask == nil else { return }
+        guard phase == .ready, analysisTask == nil, !backgroundPaused else { return }
         let mode = fileView
         let scope: Set<ItemID>? = isLargeFolder ? analysisScope : nil
         let candidates = scope.map { $0.compactMap { items[$0] } } ?? Array(items.values)
@@ -80,7 +80,7 @@ extension FolderSession {
                     self.items[chunk[i].id]?.analysis = a
                     stored.append((chunk[i].files.primary, a))
                 }
-                Task.detached(priority: .background) { index.storeAnalysis(stored) }
+                index.enqueue { [stored] in $0.storeAnalysis(stored) }
                 done += chunk.count
                 if self.shouldPublishProgress("analysis") { self.analysisProgress = (done, missing.count) }
                 if Date().timeIntervalSince(last) > 1.5 { last = Date(); self.updateSharpest() }

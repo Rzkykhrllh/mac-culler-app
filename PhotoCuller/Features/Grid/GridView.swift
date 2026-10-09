@@ -28,7 +28,8 @@ struct GridView: View {
             },
             onToggleStack: { session.toggleStack($0) },
             contextMenu: { PhotoContextMenu.make(session) },
-            onQuickMark: { id, cmd in session.apply(cmd, toItem: id) }
+            onQuickMark: { id, cmd in session.apply(cmd, toItem: id) },
+            onRangeClick: { id, adding in session.selectRange(to: id, adding: adding) }
         )
         .overlay {
             if session.display.isEmpty && session.phase == .ready {

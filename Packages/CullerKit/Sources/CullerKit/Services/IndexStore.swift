@@ -6,6 +6,13 @@ import GRDB
 /// It additionally keeps metadata writes that have not reached disk yet, so a failed write is not lost.
 public final class IndexStore: Sendable {
     private let db: DatabaseQueue
+    /// Background writes go through one serial queue: callers never block a thread waiting for the database.
+    private let writer = DispatchQueue(label: "PhotoCuller.index.writer", qos: .utility)
+
+    /// Runs `work` on the index's own write queue (in order, one at a time).
+    public func enqueue(_ work: @escaping @Sendable (IndexStore) -> Void) {
+        writer.async { work(self) }
+    }
 
     public static func defaultURL() throws -> URL {
         let base = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
@@ -18,6 +25,14 @@ public final class IndexStore: Sendable {
         func open() throws -> DatabaseQueue {
             var config = Configuration()
             config.label = "index"
+            // WAL: much cheaper writes than the rollback journal, and reads never wait for a write.
+            // NORMAL sync is plenty for a cache that can be rebuilt.
+            // Best effort: if another instance holds the file the switch waits for a later launch; it must never
+            // count as a corrupt database (that path deletes the file).
+            config.prepareDatabase { db in
+                try? db.execute(sql: "PRAGMA journal_mode = WAL")
+                try? db.execute(sql: "PRAGMA synchronous = NORMAL")
+            }
             let q = try DatabaseQueue(path: url.path, configuration: config)
             try Self.migrator.migrate(q)
             return q

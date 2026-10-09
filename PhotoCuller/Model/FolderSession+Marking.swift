@@ -179,6 +179,20 @@ extension FolderSession {
         selectionAnchor = anchorID
     }
 
+    /// ⇧-click: everything from the anchor (last plain click) to `id`, in grid order.
+    /// ⌘⇧-click adds that range to the current selection.
+    func selectRange(to id: ItemID, adding: Bool = false) {
+        guard let anchorID = selectionAnchor ?? currentID, let a = displayIndex[anchorID], let b = displayIndex[id] else {
+            select(id)
+            selectionAnchor = id
+            return
+        }
+        let range = Set(display[min(a, b)...max(a, b)].map(\.itemID))
+        selection = adding ? selection.union(range) : range
+        currentID = id
+        selectionAnchor = anchorID
+    }
+
     /// ⌥→ / ⌥←: next / previous unflagged item.
     func moveToUnflagged(_ direction: Int) {
         guard let start = currentIndex else { return }
