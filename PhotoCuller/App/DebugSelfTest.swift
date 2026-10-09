@@ -116,11 +116,22 @@ enum DebugSelfTest {
         guard let w = KeyboardController.shared.mainWindow, let content = w.contentView else { return }
         let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Snapshots")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        func snap(_ name: String) {
+        func snap(_ name: String) async {
             content.layoutSubtreeIfNeeded()
-            guard let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) else { return }
-            content.cacheDisplay(in: content.bounds, to: rep)
-            try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name + ".png"))
+            content.displayIfNeeded()
+            CATransaction.flush()
+            try? await Task.sleep(for: .milliseconds(150))   // let the window server show the new frame
+            // The window as composited (photo layers included); falls back to cacheDisplay.
+            if let cg = CGWindowListCreateImage(.null, .optionIncludingWindow, CGWindowID(w.windowNumber), [.boundsIgnoreFraming, .bestResolution]),
+               cg.width > 10 {
+                let rep = NSBitmapImageRep(cgImage: cg)
+                try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name + ".png"))
+            } else if let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) {
+                ThumbnailCellView.drawsPhotoInline = true
+                content.cacheDisplay(in: content.bounds, to: rep)
+                ThumbnailCellView.drawsPhotoInline = false
+                try? rep.representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name + ".png"))
+            }
             Log.session.info("SNAP \(name, privacy: .public)")
         }
         w.setContentSize(NSSize(width: 1300, height: 820))
@@ -135,7 +146,7 @@ enum DebugSelfTest {
         for (id, c) in zip(ids, cmds) { s.apply(c, toItem: id) }
         s.hud = nil
         try? await Task.sleep(for: .milliseconds(600))
-        snap("grid")
+        await snap("grid")
         // ⇧-click range and ⌘⇧-click add, through the collection view's real mouseDown.
         func collectionView(_ v: NSView) -> KeyPassingCollectionView? { (v as? KeyPassingCollectionView) ?? v.subviews.lazy.compactMap(collectionView).first }
         if let cv = collectionView(content), s.display.count > 8 {
@@ -153,12 +164,12 @@ enum DebugSelfTest {
             let want2 = want.union(s.display[1...8].map(\.itemID))
             Log.session.info("SNAP \(s.selection == want2 && s.currentID == s.display[8].itemID ? "ok  " : "FAIL", privacy: .public) cmd-shift-click adds range (\(s.selection.count, privacy: .public))")
             try? await Task.sleep(for: .milliseconds(300))
-            snap("shift-range")
+            await snap("shift-range")
             s.select(s.display[0].itemID)
         }
         w.setContentSize(NSSize(width: 900, height: 640))
         try? await Task.sleep(for: .milliseconds(800))
-        snap("grid-small")
+        await snap("grid-small")
         w.setContentSize(NSSize(width: 1300, height: 820))
         try? await Task.sleep(for: .milliseconds(800))
         // Hover on the 3rd cell, pointer over the 4th star.
@@ -174,27 +185,27 @@ enum DebugSelfTest {
                 cell.mouseMoved(with: move)
             }
             try? await Task.sleep(for: .milliseconds(300))
-            snap("grid-hover")
+            await snap("grid-hover")
         }
         if let id = ids.dropFirst(2).first { s.select(id) }
         s.apply(.rating(4))
         try? await Task.sleep(for: .milliseconds(250))
-        snap("hud")
+        await snap("hud")
         try? await Task.sleep(for: .milliseconds(900))
         s.showShortcuts = true
         try? await Task.sleep(for: .milliseconds(500))
-        snap("shortcuts")
+        await snap("shortcuts")
         s.showShortcuts = false
         s.viewMode = .loupe
         try? await Task.sleep(for: .seconds(2))
-        snap("loupe")
+        await snap("loupe")
         s.viewMode = .grid
         // Pairs without stacks: the RAW card behind each JPG.
         let stacksBefore = s.settings.stackBursts
         s.settings.stackBursts = false
         s.regroup()
         try? await Task.sleep(for: .seconds(2))
-        snap("pairs")
+        await snap("pairs")
         s.settings.stackBursts = stacksBefore
         s.regroup()
         // Separate mode: hover a JPG, its RAW gets the dashed outline.
@@ -234,7 +245,7 @@ enum DebugSelfTest {
             Log.session.info("SNAP \(Set(litMulti) == visibleWant ? "ok  " : "FAIL", privacy: .public) multi-select pairs: \(litMulti.count, privacy: .public) marked, \(visibleWant.count, privacy: .public) expected on screen")
             if let c = s.currentID { s.selection = [c] }
             Log.session.info("SNAP current \(s.currentItem?.fileName ?? "?", privacy: .public), hovered \(jpgCell.item?.fileName ?? "?", privacy: .public), pair: \(lit, privacy: .public)")
-            snap("separate-hover")
+            await snap("separate-hover")
             if let exit = NSEvent.enterExitEvent(with: .mouseExited, location: p, modifierFlags: [], timestamp: 0, windowNumber: w.windowNumber,
                                                  context: nil, eventNumber: 0, trackingNumber: 0, userData: nil) {
                 jpgCell.mouseExited(with: exit)
@@ -265,10 +276,10 @@ enum DebugSelfTest {
         let savedTheme = (theme.accent, theme.backdrop, theme.glow)
         theme.accent = .ocean; theme.backdrop = .slate
         try? await Task.sleep(for: .milliseconds(800))
-        snap("theme-ocean-slate")
+        await snap("theme-ocean-slate")
         theme.accent = .mint; theme.backdrop = .midnight
         try? await Task.sleep(for: .milliseconds(800))
-        snap("theme-mint-midnight")
+        await snap("theme-mint-midnight")
         (theme.accent, theme.backdrop, theme.glow) = savedTheme
         // About + Appearance, rendered off-screen.
         func render<V: View>(_ v: V, _ n: String) async {
@@ -492,6 +503,46 @@ enum DebugSelfTest {
         check(s.items.count == total, "folder back to \(total) photos")
         try? FileManager.default.removeItem(at: bin)
         Log.session.info("TRASHTEST done")
+    }
+
+    /// `-scrollTest`: scrolls the grid at a steady ~2400 pt/s and logs frame gaps (main-thread jank) and
+    /// how many visible tiles are still empty / only have a placeholder.
+    static func runScroll(_ s: FolderSession) async {
+        while s.phase != .ready { try? await Task.sleep(for: .milliseconds(100)) }
+        s.viewMode = .grid
+        try? await Task.sleep(for: .seconds(3))
+        guard let w = KeyboardController.shared.mainWindow, let content = w.contentView else { return }
+        w.setContentSize(NSSize(width: 1500, height: 950))
+        func cv(_ v: NSView) -> KeyPassingCollectionView? { (v as? KeyPassingCollectionView) ?? v.subviews.lazy.compactMap(cv).first }
+        func cells(_ v: NSView) -> [ThumbnailCellView] { (v as? ThumbnailCellView).map { [$0] } ?? v.subviews.flatMap(cells) }
+        guard let coll = cv(content), let clip = coll.enclosingScrollView?.contentView else { return }
+        var gaps: [Double] = []
+        ThumbnailCellView.drawCount = 0
+        var last = Date()
+        var emptySamples: [Double] = []
+        let maxY = max(0, coll.frame.height - clip.bounds.height)
+        for step in 0..<600 {   // ~10 s at 60 Hz
+            let y = min(maxY, Double(step) * 40)
+            clip.scroll(to: NSPoint(x: 0, y: y))
+            coll.enclosingScrollView?.reflectScrolledClipView(clip)
+            try? await Task.sleep(for: .milliseconds(16))
+            let now = Date()
+            gaps.append(now.timeIntervalSince(last) * 1000)
+            last = now
+            if step % 15 == 0 {
+                let vis = cells(content).filter { $0.window != nil && $0.visibleRect.height > 20 }
+                let empty = vis.filter { $0.image == nil }.count
+                emptySamples.append(vis.isEmpty ? 0 : Double(empty) / Double(vis.count))
+            }
+        }
+        let sorted = gaps.sorted()
+        let p50 = sorted[sorted.count / 2], p95 = sorted[sorted.count * 95 / 100], worst = sorted.last ?? 0
+        let janky = gaps.filter { $0 > 50 }.count
+        let avgEmpty = emptySamples.reduce(0, +) / Double(max(1, emptySamples.count))
+        Log.session.info("SCROLLTEST frames p50 \(Int(p50)) ms, p95 \(Int(p95)) ms, worst \(Int(worst)) ms, >50ms: \(janky)/\(gaps.count); empty tiles avg \(Int(avgEmpty * 100))%, items \(s.items.count)")
+        Log.session.info("SCROLLTEST tile draws: \(ThumbnailCellView.drawCount) in \(gaps.count) frames")
+        Log.session.info("SCROLLTEST empty% over time: \(emptySamples.map { String(Int($0 * 100)) }.joined(separator: " "), privacy: .public)")
+        Log.session.info("SCROLLTEST done")
     }
 
     static func run(_ s: FolderSession) async {

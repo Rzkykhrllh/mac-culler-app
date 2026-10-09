@@ -44,6 +44,12 @@ struct PhotoCullerApp: App {
                                 await DebugSelfTest.runSimilarity(app.session!)
                             }
                         }
+                        if args.contains("-scrollTest") {
+                            Task {
+                                while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
+                                await DebugSelfTest.runScroll(app.session!)
+                            }
+                        }
                         if args.contains("-trashTest") {
                             Task {
                                 while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }

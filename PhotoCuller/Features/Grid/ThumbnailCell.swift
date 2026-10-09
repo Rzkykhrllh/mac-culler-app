@@ -132,21 +132,117 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
     private var dragStarted = false
 
     // Hover
-    private var isHovered = false { didSet { if oldValue != isHovered { needsDisplay = true } } }
+    /// Only one tile is ever hovered: fast scrolling can deliver mouseEntered to tiles passing under the pointer
+    /// without the matching mouseExited, which used to leave hover bars on several tiles.
+    private static weak var hoveredCell: ThumbnailCellView?
+    private var isHovered = false {
+        didSet {
+            guard oldValue != isHovered else { return }
+            needsDisplay = true
+            if isHovered {
+                if let other = Self.hoveredCell, other !== self { other.resetHover() }
+                Self.hoveredCell = self
+            } else if Self.hoveredCell === self {
+                Self.hoveredCell = nil
+            }
+        }
+    }
     private var hoverPoint: NSPoint? { didSet { if hoverControl(at: hoverPoint) != hoverControl(at: oldValue) { needsDisplay = true } } }
     private enum Control: Equatable { case pick, reject, star(Int) }
     private var controlRects: [(Control, NSRect)] = []
+
+    /// The photo is a Core Animation layer (composited on the GPU, color-matched once), not drawn in `draw(_:)`:
+    /// re-rasterizing every visible photo on the CPU made scrolling stutter. Card, border and placeholder are
+    /// drawn below it; badges, hover bar and outlines are drawn by `overlay`, above it.
+    private let photoShadow = CALayer()
+    private let photoLayer = CALayer()
+    private let overlay = CellOverlayView()
+    /// Where the photo sits (set by the base pass, used by the overlay pass).
+    private var geometry: (card: NSRect, photo: NSRect, radius: CGFloat, isPile: Bool)?
+    /// DEBUG snapshots (cacheDisplay doesn't capture sublayer contents) draw the photo inline instead.
+    static var drawsPhotoInline = false
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
         addToolTip(bounds, owner: self, userData: nil)
+        photoShadow.shadowColor = NSColor.black.cgColor
+        photoShadow.shadowOpacity = 0.5
+        photoShadow.shadowRadius = 3
+        photoShadow.shadowOffset = CGSize(width: 0, height: -2)
+        photoShadow.zPosition = 1
+        photoLayer.masksToBounds = true
+        photoLayer.contentsGravity = .resize
+        photoLayer.minificationFilter = .trilinear
+        photoLayer.zPosition = 2
+        layer?.addSublayer(photoShadow)
+        layer?.addSublayer(photoLayer)
+        overlay.owner = self
+        overlay.frame = bounds
+        overlay.autoresizingMask = [.width, .height]
+        overlay.wantsLayer = true
+        overlay.layerContentsRedrawPolicy = .onSetNeedsDisplay
+        addSubview(overlay)
+        overlay.layer?.zPosition = 3
+    }
+
+    override var needsDisplay: Bool {
+        didSet {
+            if needsDisplay { overlay.needsDisplay = true }
+        }
+    }
+
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        photoLayer.contentsScale = window?.backingScaleFactor ?? 2
+    }
+
+    /// Only touches layer properties that actually change: assigning them (even the same value) from inside
+    /// `draw(_:)` marked the view dirty again, so every visible tile redrew on every frame.
+    private func placePhoto(_ r: NSRect?, corner: CGFloat, dimmed: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        guard let r, let image, !Self.drawsPhotoInline else {
+            if !photoLayer.isHidden { photoLayer.isHidden = true; photoShadow.isHidden = true }
+            if photoLayer.contents != nil { photoLayer.contents = nil }
+            return
+        }
+        if (photoLayer.contents as! CGImage?) !== image { photoLayer.contents = image }
+        if photoLayer.frame != r {
+            photoLayer.frame = r
+            photoShadow.frame = r
+            photoShadow.shadowPath = CGPath(roundedRect: CGRect(origin: .zero, size: r.size), cornerWidth: corner, cornerHeight: corner, transform: nil)
+        }
+        if photoLayer.cornerRadius != corner { photoLayer.cornerRadius = corner }
+        let opacity: Float = dimmed ? 0.35 : 1
+        if photoLayer.opacity != opacity { photoLayer.opacity = opacity }
+        if photoLayer.isHidden { photoLayer.isHidden = false; photoShadow.isHidden = false }
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+
+    /// The tile is rendered once into a bitmap that becomes the layer's contents, and only again when something
+    /// on it changes (`needsDisplay`). With plain `draw(_:)`, AppKit drew each tile strip by strip as it scrolled
+    /// into view — ~70 full draws per tile.
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        layer?.contents = LayerRenderer.render(self) { self.draw(self.bounds) }
+        layer?.contentsScale = window?.backingScaleFactor ?? 2
+        // Whatever made the tile redraw (new item on reuse, new image, marks) may change the overlay too;
+        // AppKit can redraw the tile without going through `needsDisplay`, so never leave a stale overlay.
+        overlay.needsDisplay = true
+    }
+
+    override func setNeedsDisplay(_ invalidRect: NSRect) {
+        super.setNeedsDisplay(invalidRect)
+        overlay.needsDisplay = true
+    }
 
     // MARK: Tooltips
 
@@ -164,19 +260,12 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         hoverPoint = nil
     }
 
-    private func syncHoverWithPointer() {
-        guard let window else { resetHover(); return }
-        let p = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        let inside = visibleRect.contains(p)
-        if inside != isHovered {
-            isHovered = inside
-            hoverPoint = inside ? p : nil
-        }
-    }
 
     override func setFrameSize(_ newSize: NSSize) {
+        let changed = newSize != frame.size
         super.setFrameSize(newSize)
-        needsDisplay = true
+        // The collection view re-applies frames on every layout pass while scrolling: redraw only on a real change.
+        if changed { needsDisplay = true }
     }
 
     override func updateTrackingAreas() {
@@ -186,8 +275,8 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
                                        owner: self, userInfo: nil))
         removeAllToolTips()
         addToolTip(bounds, owner: self, userData: nil)
-        // Scrolling moves cells under a still pointer without enter/exit events.
-        syncHoverWithPointer()
+        // Hover follows real mouse events only. Re-checking the pointer here (this runs for every tile on every
+        // scroll step) made tiles trade the hover back and forth and redraw ~80 times per frame.
     }
 
     override func mouseEntered(with event: NSEvent) {
@@ -278,6 +367,9 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
     }
 
     private func dragImage() -> NSImage {
+        // cacheDisplay goes through draw(_:), which leaves the photo to its layer: draw it inline for this.
+        Self.drawsPhotoInline = true
+        defer { Self.drawsPhotoInline = false; needsDisplay = true }
         guard let rep = bitmapImageRepForCachingDisplay(in: bounds) else { return NSImage(size: bounds.size) }
         cacheDisplay(in: bounds, to: rep)
         let img = NSImage(size: bounds.size)
@@ -290,7 +382,14 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
     private static let star = NSColor(calibratedRed: 1, green: 0.8, blue: 0.3, alpha: 1)
     private static let sharpGreen = NSColor(calibratedRed: 0.45, green: 1, blue: 0.55, alpha: 1)
 
+    #if DEBUG
+    static var drawCount = 0
+    #endif
+
     override func draw(_ dirtyRect: NSRect) {
+        #if DEBUG
+        Self.drawCount += 1
+        #endif
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         let b = bounds.insetBy(dx: compact ? 2 : 3, dy: compact ? 2 : 3)
         let meta = item?.metadata ?? .empty
@@ -352,8 +451,9 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
             }
         }
 
-        // Photo, with a soft shadow, as large as the card allows.
-        if let image {
+        // Photo, with a soft shadow, as large as the card allows (a layer; see `photoLayer`).
+        placePhoto(image == nil ? nil : r, corner: compact ? 3 : 5, dimmed: meta.flag == .reject)
+        if let image, Self.drawsPhotoInline {
             let path = CGPath(roundedRect: r, cornerWidth: compact ? 3 : 5, cornerHeight: compact ? 3 : 5, transform: nil)
             ctx.saveGState()
             ctx.setShadow(offset: CGSize(width: 0, height: 2), blur: 6, color: NSColor(white: 0, alpha: 0.5).cgColor)
@@ -370,7 +470,7 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
             ctx.setAlpha(meta.flag == .reject ? 0.35 : 1)
             ctx.draw(image, in: r)
             ctx.restoreGState()
-        } else {
+        } else if image == nil {
             // Loading placeholder.
             NSColor(white: 1, alpha: 0.04).setFill()
             NSBezierPath(roundedRect: r, xRadius: 6, yRadius: 6).fill()
@@ -411,6 +511,14 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
             card.stroke()
         }
 
+        geometry = (b, r, radius, isPile)
+    }
+
+    /// Overlay pass (drawn above the photo layer): outlines, badges, hover bar.
+    fileprivate func drawOverlay() {
+        guard let g = geometry else { return }
+        let b = g.card, r = g.photo, radius = g.radius, isPile = g.isPile
+        let meta = item?.metadata ?? .empty
         let pad: CGFloat = compact ? 3 : 5
         let showHoverBar = isHovered && !compact && image != nil && r.width > 110
 
@@ -516,8 +624,7 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         let font = NSFont.systemFont(ofSize: compact ? 8.5 : 10, weight: .semibold)
         let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: textColor]
         let textSize = text.map { ($0 as NSString).size(withAttributes: attrs) } ?? .zero
-        let img = symbol.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: compact ? 7.5 : 9, weight: .bold).applying(.init(paletteColors: [color]))) }
+        let img = symbol.flatMap { SymbolCache.image($0, size: compact ? 7.5 : 9, color: color) }
         let iconW = img?.size.width ?? 0
         let gap: CGFloat = (img != nil && text != nil) ? 3 : 0
         var rect = NSRect(x: p.x, y: p.y, width: max(h, iconW + gap + textSize.width + (compact ? 8 : 11)), height: h)
@@ -541,11 +648,9 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         let size: CGFloat = compact ? 7.5 : 9
         var items: [NSImage] = []
         for (sym, color) in parts {
-            if let sym, let i = NSImage(systemSymbolName: sym, accessibilityDescription: nil)?
-                .withSymbolConfiguration(.init(pointSize: size, weight: .bold).applying(.init(paletteColors: [color]))) {
+            if let sym, let i = SymbolCache.image(sym, size: size, color: color) {
                 items.append(i)
-            } else if sym == nil, let s = NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)?
-                .withSymbolConfiguration(.init(pointSize: size, weight: .bold).applying(.init(paletteColors: [color]))) {
+            } else if sym == nil, let s = SymbolCache.image("star.fill", size: size, color: color) {
                 // Small cells (filmstrip): one star + the number, so it never collides with the stack badge.
                 items += compact ? [s] : Array(repeating: s, count: rating)
             }
@@ -612,8 +717,7 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
     }
 
     private func icon(_ name: String, in r: NSRect, color: NSColor, size: CGFloat = 11) {
-        guard let img = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(.init(pointSize: size, weight: .bold).applying(.init(paletteColors: [color]))) else { return }
+        guard let img = SymbolCache.image(name, size: size, color: color) else { return }
         img.draw(in: NSRect(x: r.midX - img.size.width / 2, y: r.midY - img.size.height / 2, width: img.size.width, height: img.size.height),
                  from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
@@ -650,4 +754,78 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
     }
 
 
+}
+
+/// SF Symbols rendered once per name / size / color into a bitmap. Drawing a configured symbol image
+/// re-rasterizes it every time; with a dozen badges per tile that alone made scrolling stutter.
+@MainActor
+enum SymbolCache {
+    private static var cache: [String: NSImage] = [:]
+
+    static func image(_ name: String, size: CGFloat, color: NSColor) -> NSImage? {
+        let c = color.usingColorSpace(.sRGB) ?? color
+        let key = "\(name)|\(size)|\(c.redComponent)|\(c.greenComponent)|\(c.blueComponent)|\(c.alphaComponent)"
+        if let img = cache[key] { return img }
+        guard let sym = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: size, weight: .bold).applying(.init(paletteColors: [color]))) else { return nil }
+        let s = sym.size
+        let scale: CGFloat = 2
+        guard s.width > 0, s.height > 0,
+              let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int((s.width * scale).rounded(.up)),
+                                         pixelsHigh: Int((s.height * scale).rounded(.up)), bitsPerSample: 8, samplesPerPixel: 4,
+                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        else { return sym }
+        rep.size = s
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        sym.draw(in: NSRect(origin: .zero, size: s))
+        NSGraphicsContext.restoreGraphicsState()
+        let img = NSImage(size: s)
+        img.addRepresentation(rep)
+        if cache.count > 500 { cache.removeAll() }
+        cache[key] = img
+        return img
+    }
+}
+
+/// Draws `ThumbnailCellView`'s overlay above its photo layer; never takes mouse events.
+final class CellOverlayView: NSView {
+    weak var owner: ThumbnailCellView?
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override var wantsUpdateLayer: Bool { true }
+    override func updateLayer() {
+        layer?.contents = LayerRenderer.render(self) { self.owner?.drawOverlay() }
+        layer?.contentsScale = window?.backingScaleFactor ?? 2
+    }
+    override func draw(_ dirtyRect: NSRect) { owner?.drawOverlay() }
+}
+
+/// Runs AppKit drawing code (flipped, top-left origin) into a bitmap for a layer's contents.
+@MainActor
+enum LayerRenderer {
+    /// Renders at the view's size and backing scale, with its appearance (for dynamic colors).
+    static func render(_ view: NSView, _ draw: () -> Void) -> CGImage? {
+        var img: CGImage?
+        view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            img = render(size: view.bounds.size, scale: view.window?.backingScaleFactor ?? 2, draw)
+        }
+        return img
+    }
+
+    static func render(size: NSSize, scale: CGFloat, _ draw: () -> Void) -> CGImage? {
+        let w = Int((size.width * scale).rounded(.up)), h = Int((size.height * scale).rounded(.up))
+        guard w > 0, h > 0,
+              let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)
+        else { return nil }
+        ctx.translateBy(x: 0, y: CGFloat(h))
+        ctx.scaleBy(x: scale, y: -scale)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
+        draw()
+        NSGraphicsContext.restoreGraphicsState()
+        return ctx.makeImage()
+    }
 }
