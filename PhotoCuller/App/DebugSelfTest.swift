@@ -138,6 +138,7 @@ enum DebugSelfTest {
         let savedSize = s.settings.thumbnailSize
         defer { s.settings.thumbnailSize = savedSize }
         s.settings.thumbnailSize = 200   // same layout whatever size the user picked
+        s.app.sidebarVisibility = .all
         s.viewMode = .grid
         try? await Task.sleep(for: .seconds(4))   // thumbnails
         // A few marks to show the badges (undone at the end).
