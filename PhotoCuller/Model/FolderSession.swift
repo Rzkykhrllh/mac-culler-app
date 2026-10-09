@@ -30,6 +30,8 @@ final class FolderSession {
     @ObservationIgnored var partnerIndexValid = false
     @ObservationIgnored var partnerIndexMode: FileViewMode?
     @ObservationIgnored var nearbyAnalysisTask: Task<Void, Never>?
+    /// True while this session's tab is not the active one: no indexing / analysis in the background.
+    @ObservationIgnored var backgroundPaused = false
     /// Photos whose analysis failed (undecodable): not retried in this session.
     @ObservationIgnored var analysisFailed: Set<ItemID> = []
     /// Photos currently marked sharpest-in-stack, so updates only touch the ones that change.
@@ -191,6 +193,7 @@ final class FolderSession {
         selection = currentID.map { [$0] } ?? []
         phase = .ready
         startWatching()
+        backgroundPaused = app.activeTab.session !== self
         indexMissing()
         ensureFeaturePrints()
         ensureAnalysis()
@@ -207,7 +210,28 @@ final class FolderSession {
     }
 
     /// Background pass reading XMP + EXIF for items the index did not have (spec §7: progressive EXIF filters).
+    /// The tab went to the background: stop indexing / analysis so the visible tab gets the machine.
+    func pauseBackgroundWork() {
+        guard !backgroundPaused else { return }
+        backgroundPaused = true
+        indexTask?.cancel()
+        analysisTask?.cancel()
+        similarityTask?.cancel()
+        nearbyAnalysisTask?.cancel()
+        indexing = nil
+    }
+
+    func resumeBackgroundWork() {
+        guard backgroundPaused else { return }
+        backgroundPaused = false
+        guard phase == .ready else { return }
+        indexMissing()
+        ensureFeaturePrints()
+        ensureAnalysis()
+    }
+
     func indexMissing(_ only: [PhotoItem]? = nil) {
+        guard !backgroundPaused else { return }
         let todo = (only ?? Array(items.values)).filter { !$0.metadataLoaded || $0.exif == nil }
             .map { (id: $0.id, files: $0.files, needMeta: !$0.metadataLoaded, needExif: $0.exif == nil) }
         guard !todo.isEmpty else { return }
@@ -260,9 +284,9 @@ final class FolderSession {
                         metaRows.append((item.id, IndexStore.signature(of: item.files), m.metadata))
                     }
                 }
-                Task.detached(priority: .utility) {
-                    index.storeExif(exifRows)
-                    index.storeMetadata(metaRows)
+                index.enqueue { [exifRows, metaRows] in
+                    $0.storeExif(exifRows)
+                    $0.storeMetadata(metaRows)
                 }
                 done += rows.count
                 if self.shouldPublishProgress("index") {

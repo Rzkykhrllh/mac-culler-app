@@ -27,6 +27,8 @@ struct ThumbnailCollection: NSViewRepresentable {
     var contextMenu: () -> NSMenu? = { nil }
     /// Hover-bar action on one photo.
     var onQuickMark: ((ItemID, MarkCommand) -> Void)?
+    /// ⇧-click (range from the anchor); the flag is true for ⌘⇧-click (add the range).
+    var onRangeClick: ((ItemID, Bool) -> Void)?
 
     static let spacing: CGFloat = 4
     static let inset: CGFloat = 8
@@ -62,6 +64,7 @@ struct ThumbnailCollection: NSViewRepresentable {
         context.coordinator.collectionView = cv
         context.coordinator.observeResize(sv)
         cv.onRightClick = { [weak coordinator = context.coordinator] ip in coordinator?.rightClicked(ip) }
+        cv.onShiftClick = { [weak coordinator = context.coordinator] ip, adding in coordinator?.shiftClicked(ip, adding: adding) ?? false }
         context.coordinator.apply(self, force: true)
         return sv
     }
@@ -210,6 +213,13 @@ struct ThumbnailCollection: NSViewRepresentable {
             }
         }
 
+        /// Returns false when the click should get the collection view's default handling.
+        func shiftClicked(_ ip: IndexPath, adding: Bool) -> Bool {
+            guard let f = parent.onRangeClick, entries.indices.contains(ip.item) else { return false }
+            f(entries[ip.item].itemID, adding)
+            return true
+        }
+
         /// Right-click on an unselected item selects it first (Finder behaviour).
         func rightClicked(_ ip: IndexPath?) {
             guard let cv = collectionView, let ip, entries.indices.contains(ip.item) else { return }
@@ -304,6 +314,20 @@ struct ThumbnailCollection: NSViewRepresentable {
 /// and provides the right-click menu.
 final class KeyPassingCollectionView: NSCollectionView {
     var onRightClick: ((IndexPath?) -> Void)?
+    /// ⇧-click / ⌘⇧-click on an item: range selection, handled by the session (NSCollectionView's own
+    /// shift-click does not select a contiguous range).
+    var onShiftClick: ((IndexPath, Bool) -> Bool)?
+
+    override func mouseDown(with event: NSEvent) {
+        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if mods.contains(.shift), event.clickCount == 1,
+           let ip = indexPathForItem(at: convert(event.locationInWindow, from: nil)),
+           onShiftClick?(ip, mods.contains(.command)) == true {
+            window?.makeFirstResponder(self)
+            return
+        }
+        super.mouseDown(with: event)
+    }
     var contextMenuProvider: (() -> NSMenu?)?
 
     override func keyDown(with event: NSEvent) {

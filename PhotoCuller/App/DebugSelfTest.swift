@@ -136,6 +136,26 @@ enum DebugSelfTest {
         s.hud = nil
         try? await Task.sleep(for: .milliseconds(600))
         snap("grid")
+        // ⇧-click range and ⌘⇧-click add, through the collection view's real mouseDown.
+        func collectionView(_ v: NSView) -> KeyPassingCollectionView? { (v as? KeyPassingCollectionView) ?? v.subviews.lazy.compactMap(collectionView).first }
+        if let cv = collectionView(content), s.display.count > 8 {
+            func click(_ i: Int, _ mods: NSEvent.ModifierFlags) {
+                guard let frame = cv.layoutAttributesForItem(at: IndexPath(item: i, section: 0))?.frame else { return }
+                let p = cv.convert(NSPoint(x: frame.midX, y: frame.midY), to: nil)
+                if let e = NSEvent.mouseEvent(with: .leftMouseDown, location: p, modifierFlags: mods, timestamp: 0, windowNumber: w.windowNumber,
+                                              context: nil, eventNumber: 0, clickCount: 1, pressure: 1) { cv.mouseDown(with: e) }
+            }
+            s.select(s.display[1].itemID); s.selectionAnchor = s.display[1].itemID
+            click(5, .shift)
+            let want = Set(s.display[1...5].map(\.itemID))
+            Log.session.info("SNAP \(s.selection == want ? "ok  " : "FAIL", privacy: .public) shift-click selects 2…6 (\(s.selection.count, privacy: .public))")
+            click(8, [.shift, .command])
+            let want2 = want.union(s.display[1...8].map(\.itemID))
+            Log.session.info("SNAP \(s.selection == want2 && s.currentID == s.display[8].itemID ? "ok  " : "FAIL", privacy: .public) cmd-shift-click adds range (\(s.selection.count, privacy: .public))")
+            try? await Task.sleep(for: .milliseconds(300))
+            snap("shift-range")
+            s.select(s.display[0].itemID)
+        }
         w.setContentSize(NSSize(width: 900, height: 640))
         try? await Task.sleep(for: .milliseconds(800))
         snap("grid-small")
