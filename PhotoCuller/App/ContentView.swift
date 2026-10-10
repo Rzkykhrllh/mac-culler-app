@@ -52,7 +52,15 @@ struct ContentView: View {
             KeyboardController.shared.mainWindow = window
             window.tabbingMode = .disallowed
             window.contentMinSize = NSSize(width: 900, height: 560)
+            let full = window.styleMask.contains(.fullScreen)
+            if app.isFullScreen != full { app.isFullScreen = full }
         })
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { n in
+            if (n.object as? NSWindow) === KeyboardController.shared.mainWindow { app.isFullScreen = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { n in
+            if (n.object as? NSWindow) === KeyboardController.shared.mainWindow { app.isFullScreen = false }
+        }
         .sheet(isPresented: $app.showGuide, onDismiss: { app.guideClosed() }) { GettingStartedView() }
         .alert(item: $app.alert) { a in
             Alert(title: Text(a.title), message: Text(a.message))
@@ -70,7 +78,8 @@ struct SessionView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
-                if session.showFilterBar && !session.isFullScreen {
+                // Shown whenever it is turned on — also in full screen (hiding it there made ⌘F look broken).
+                if session.showFilterBar {
                     FilterBar(session: session, focused: $filterFocused)
                         .padding(.horizontal, 10)
                         .padding(.top, 8)
@@ -131,11 +140,11 @@ struct SessionView: View {
                     .allowsHitTesting(false)
                     .animation(.smooth(duration: 0.2), value: session.toast)
                 }
-                if !session.isFullScreen && session.viewMode == .grid {
+                if session.viewMode == .grid {
                     Color.clear.frame(height: 44) // room for the floating status bar
                 }
             }
-            if !session.isFullScreen && session.viewMode == .grid {
+            if session.viewMode == .grid {
                 StatusBar(session: session)
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
@@ -153,12 +162,6 @@ struct SessionView: View {
             }
         }
         .onChange(of: session.showFilterBar) { if session.showFilterBar { filterFocused = true } }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { n in
-            if (n.object as? NSWindow) === KeyboardController.shared.mainWindow { session.isFullScreen = true }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { n in
-            if (n.object as? NSWindow) === KeyboardController.shared.mainWindow { session.isFullScreen = false }
-        }
         .onReceive(NotificationCenter.default.publisher(for: .focusFilterBar)) { _ in
             session.showFilterBar = true
             filterFocused = true

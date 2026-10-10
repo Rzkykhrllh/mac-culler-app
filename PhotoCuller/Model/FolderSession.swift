@@ -102,7 +102,7 @@ final class FolderSession {
     /// Filmstrip under loupe / compare (stays visible in full screen unless hidden with ⌥⌘B).
     var showFilmstrip = true
     var editingNote: ItemID?
-    var isFullScreen = false
+    var isFullScreen: Bool { app.isFullScreen }
     var compare = CompareState()
     var writeFailures = 0
     var fileOperation: FileOperationProgress?
