@@ -12,6 +12,11 @@ struct CompareView: View {
         VStack(spacing: 0) {
             slotsGrid
                 .padding(6)
+                .overlay(alignment: .topTrailing) {
+                    FitButton(hub: session.viewports)
+                        .padding(14)
+                        .animation(.smooth(duration: 0.15), value: session.viewports.zoomPercent)
+                }
             if session.showFilmstrip {
                 CompareToolbar(session: session)
                     .padding(.horizontal, 10)

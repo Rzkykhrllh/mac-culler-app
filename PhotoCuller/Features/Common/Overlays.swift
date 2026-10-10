@@ -40,19 +40,22 @@ struct MarkHUDView: View {
 struct ShortcutSheet: View {
     let onClose: () -> Void
 
-    private let groups: [(String, String, [(String, String)])] = [
-        ("Mark", "flag", [("P / X / U", "Pick · Reject · Unflag"), ("0 – 5", "Rating"), ("6 7 8 9", "Red · Yellow · Green · Blue"),
-                         ("⌥9 / ⌥0", "Purple · Clear label"), ("⇧ + key", "Mark and go to next"), ("Caps Lock", "Auto-advance"), ("M", "Note")]),
+    private var groups: [(String, String, [(String, String)])] {
+        let k = KeyMap.labels
+        return [
+        ("Mark", "flag", [(k(["mark.pick", "mark.reject", "mark.unflag"], " / "), "Pick · Reject · Unflag"), (k((0...5).map { "rating.\($0)" }, " "), "Rating"), (k(["label.red", "label.yellow", "label.green", "label.blue"], " "), "Red · Yellow · Green · Blue"),
+                         (k(["label.purple", "label.clear"], " / "), "Purple · Clear label"), ("⇧ + key", "Mark and go to next"), ("Caps Lock", "Auto-advance"), (KeyMap.label("mark.note"), "Note")]),
         ("Move around", "arrow.left.arrow.right", [("← →", "Previous · Next"), ("↑ ↓", "Row up · down (grid)"), ("⌥← ⌥→", "Previous · Next unflagged"),
                                                   ("⇧ + arrows · ⇧-click", "Select a block (grid & loupe)"), ("Return", "Open in loupe"), ("Esc", "Back to grid")]),
-        ("View", "eye", [("G / E / C", "Grid · Loupe · Compare"), ("Z / Space", "100% zoom"), ("I / H", "Info panel · Histogram"),
+        ("View", "eye", [(k(["view.grid", "view.loupe", "view.compare"], " / "), "Grid · Loupe · Compare"), (k(["view.zoom", "view.zoomSpace"], " / "), "100% zoom · again: fit"), ("⌘0", "Zoom to fit"), (k(["view.info", "view.histogram"], " / "), "Info panel · Histogram"),
                          ("⌘F", "Filter"), ("⌘= / ⌘−", "Thumbnail size"), ("⌥⌘1 – 4", "RAW+JPG · Separate · JPG · RAW")]),
-        ("Focus", "scope", [("F", "Focus peaking"), ("J", "Clipping"), ("Y", "Zoom to eyes / face / animal"), ("B", "Sharpest in stack")]),
-        ("Stacks & compare", "square.stack", [("S", "Expand / collapse"), ("⇧S / ⌥S", "Stacks on/off · Bursts ↔ Similar"), ("⌥[ / ⌥]", "Similarity stricter · looser"),
+        ("Focus", "scope", [(KeyMap.label("focus.peaking"), "Focus peaking"), (KeyMap.label("focus.clipping"), "Clipping"), (KeyMap.label("focus.subject"), "Zoom to eyes / face / animal"), (KeyMap.label("focus.sharpest"), "Sharpest in stack")]),
+        ("Stacks & compare", "square.stack", [(KeyMap.label("stack.toggle"), "Expand / collapse"), ("⇧S / ⌥S", "Stacks on/off · Bursts ↔ Similar"), ("⌥[ / ⌥]", "Similarity stricter · looser"),
                                               ("Tab", "Next compare slot"), ("⌥Z / ⌥P", "Sync zoom · Pin best"), ("⌥2 – ⌥4", "Number of slots")]),
-        ("Files & tabs", "folder", [("F2", "Rename"), ("⇧⌘M / ⇧⌘C", "Move · Copy"), ("⌫ / ⇧⌘⌫", "Trash photo · all rejects"), ("⌃⌘L / ⌃⇧⌘L", "To Lightroom · all picks"), ("⌘Z / ⇧⌘Z", "Undo · Redo"), ("⌘T / ⌘W", "New · Close tab"),
+        ("Files & tabs", "folder", [("F2", "Rename"), ("⇧⌘M / ⇧⌘C", "Move · Copy"), (KeyMap.label("file.trash") + " / ⇧⌘⌫", "Trash photo · all rejects"), ("⌃⌘L / ⌃⇧⌘L", "To Lightroom · all picks"), ("⌘Z / ⇧⌘Z", "Undo · Redo"), ("⌘T / ⌘W", "New · Close tab"),
                                     ("⌘1 – 9", "Go to tab"), ("⌘↑ / ⌥⌘↓", "Enclosing · Next folder")]),
     ]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {

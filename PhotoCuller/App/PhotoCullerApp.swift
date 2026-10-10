@@ -44,6 +44,12 @@ struct PhotoCullerApp: App {
                                 await DebugSelfTest.runSimilarity(app.session!)
                             }
                         }
+                        if args.contains("-shortcutTest") {
+                            Task {
+                                while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
+                                await DebugSelfTest.runShortcuts(app.session!)
+                            }
+                        }
                         if args.contains("-modeTest") {
                             Task {
                                 while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
