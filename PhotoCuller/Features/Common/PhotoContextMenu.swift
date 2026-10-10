@@ -93,6 +93,24 @@ enum PhotoContextMenu {
         menu.addItem(check(ActionMenuItem("Focus Peaking", key: "f") { s.showPeaking.toggle() }, s.showPeaking))
         menu.addItem(check(ActionMenuItem("Clipping", key: "j") { s.showClipping.toggle() }, s.showClipping))
 
+        // Hand-off: Lightroom import right here, any other editor under Open With.
+        menu.addItem(.separator())
+        if let lr = ExternalApps.lightroom {
+            let item = ActionMenuItem(targets.count > 1 ? "Import \(targets.count) Photos to \(lr.name)" : "Import to \(lr.name)",
+                                      key: "l", modifiers: [.command, .control]) { s.importToLightroom(targets) }
+            item.image = ExternalApps.icon(lr.url)
+            menu.addItem(item)
+        }
+        let openWith = NSMenu()
+        for app in ExternalApps.editors(for: targets[0].files.primary.url) {
+            let item = ActionMenuItem(ExternalApps.name(of: app)) { s.open(targets, in: app) }
+            item.image = ExternalApps.icon(app)
+            openWith.addItem(item)
+        }
+        if !openWith.items.isEmpty { openWith.addItem(.separator()) }
+        openWith.addItem(ActionMenuItem("Other App…") { if let app = ExternalApps.chooseApp() { s.open(targets, in: app) } })
+        menu.addItem(submenu("Open With", openWith))
+
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem("Rename…", key: String(UnicodeScalar(NSF2FunctionKey)!)) { s.activeSheet = .rename })
         menu.addItem(ActionMenuItem("Move…", key: "m", modifiers: [.command, .shift]) { s.activeSheet = .move })
