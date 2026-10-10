@@ -272,6 +272,11 @@ enum DebugSelfTest {
             snapSheet("guide-3")
             s.app.showGuide = false
         }
+        s.showFilterBar = true
+        try? await Task.sleep(for: .milliseconds(700))
+        Log.session.info("SNAP filter bar: showFilterBar \(s.showFilterBar), fullscreen flag \(s.isFullScreen), window fullscreen \(w.styleMask.contains(.fullScreen))")
+        await snap("filter-bar")
+        s.showFilterBar = false
         // Another theme (restored right after: these are the user's real settings).
         let theme = ThemeStore.shared
         let savedTheme = (theme.accent, theme.backdrop, theme.glow)

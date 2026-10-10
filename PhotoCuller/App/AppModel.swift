@@ -35,6 +35,8 @@ final class AppModel {
     /// Incremented whenever the operation log changes so the History window refreshes.
     private(set) var historyRevision = 0
     var alert: AppAlert?
+    /// The main window is in macOS full screen (one flag for the window, not per tab, so it can't go stale).
+    var isFullScreen = false
     /// Getting Started guide (shown automatically on first launch).
     var showGuide = !UserDefaults.standard.bool(forKey: "hasSeenGuide")
     func guideClosed() { UserDefaults.standard.set(true, forKey: "hasSeenGuide") }
