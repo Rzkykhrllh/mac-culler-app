@@ -44,13 +44,13 @@ struct ShortcutSheet: View {
         ("Mark", "flag", [("P / X / U", "Pick · Reject · Unflag"), ("0 – 5", "Rating"), ("6 7 8 9", "Red · Yellow · Green · Blue"),
                          ("⌥9 / ⌥0", "Purple · Clear label"), ("⇧ + key", "Mark and go to next"), ("Caps Lock", "Auto-advance"), ("M", "Note")]),
         ("Move around", "arrow.left.arrow.right", [("← →", "Previous · Next"), ("↑ ↓", "Row up · down (grid)"), ("⌥← ⌥→", "Previous · Next unflagged"),
-                                                  ("⇧ + arrows", "Extend selection"), ("Return", "Open in loupe"), ("Esc", "Back to grid")]),
+                                                  ("⇧ + arrows · ⇧-click", "Select a block (grid & loupe)"), ("Return", "Open in loupe"), ("Esc", "Back to grid")]),
         ("View", "eye", [("G / E / C", "Grid · Loupe · Compare"), ("Z / Space", "100% zoom"), ("I / H", "Info panel · Histogram"),
                          ("⌘F", "Filter"), ("⌘= / ⌘−", "Thumbnail size"), ("⌥⌘1 – 4", "RAW+JPG · Separate · JPG · RAW")]),
         ("Focus", "scope", [("F", "Focus peaking"), ("J", "Clipping"), ("Y", "Zoom to eyes / face / animal"), ("B", "Sharpest in stack")]),
         ("Stacks & compare", "square.stack", [("S", "Expand / collapse"), ("⇧S / ⌥S", "Stacks on/off · Bursts ↔ Similar"), ("⌥[ / ⌥]", "Similarity stricter · looser"),
                                               ("Tab", "Next compare slot"), ("⌥Z / ⌥P", "Sync zoom · Pin best"), ("⌥2 – ⌥4", "Number of slots")]),
-        ("Files & tabs", "folder", [("F2", "Rename"), ("⇧⌘M / ⇧⌘C", "Move · Copy"), ("⌘⌫ / ⇧⌘⌫", "Trash photo · all rejects"), ("⌃⌘L / ⌃⇧⌘L", "To Lightroom · all picks"), ("⌘Z / ⇧⌘Z", "Undo · Redo"), ("⌘T / ⌘W", "New · Close tab"),
+        ("Files & tabs", "folder", [("F2", "Rename"), ("⇧⌘M / ⇧⌘C", "Move · Copy"), ("⌫ / ⇧⌘⌫", "Trash photo · all rejects"), ("⌃⌘L / ⌃⇧⌘L", "To Lightroom · all picks"), ("⌘Z / ⇧⌘Z", "Undo · Redo"), ("⌘T / ⌘W", "New · Close tab"),
                                     ("⌘1 – 9", "Go to tab"), ("⌘↑ / ⌥⌘↓", "Enclosing · Next folder")]),
     ]
 

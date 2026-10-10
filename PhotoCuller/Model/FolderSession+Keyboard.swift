@@ -13,9 +13,9 @@ extension FolderSession {
         case .mark(let cmd):
             apply(cmd, advance: m.advance)
         case .next:
-            viewMode == .compare ? stepActiveSlot(1) : move(1, extend: m.extend && viewMode == .grid)
+            viewMode == .compare ? stepActiveSlot(1) : move(1, extend: m.extend)
         case .previous:
-            viewMode == .compare ? stepActiveSlot(-1) : move(-1, extend: m.extend && viewMode == .grid)
+            viewMode == .compare ? stepActiveSlot(-1) : move(-1, extend: m.extend)
         case .up, .down:
             guard viewMode == .grid else { return false }
             move((m.action == .up ? -1 : 1) * max(1, gridColumns), extend: m.extend)
@@ -38,6 +38,8 @@ extension FolderSession {
             zoomToSubject()
         case .sharpest:
             goToSharpest()
+        case .trash:
+            trashSelection()
         case .toggleStripShowsAll:
             guard viewMode == .compare else { return false }
             setCompareStripShowsAll(!compare.stripShowsAll)

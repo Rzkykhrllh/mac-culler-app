@@ -53,6 +53,7 @@ private struct GeneralSettings: View {
             Toggle("Include subfolders by default", isOn: $s.includeSubfoldersByDefault)
             Stepper("Warn when a subfolder scan exceeds \(s.subfolderWarningThreshold.formatted()) photos",
                     value: $s.subfolderWarningThreshold, in: 500...100_000, step: 500)
+            Toggle("Ask before moving photos to the Trash (⌫)", isOn: $s.confirmTrash)
             Toggle("Sync color labels to Finder tags", isOn: $s.syncFinderTags)
                 .onChange(of: s.syncFinderTags) { app.applyWriteOptions() }
             Text("Only the app’s own color tags (Red, Yellow, Green, Blue, Purple) are added or removed; other tags are never touched.")

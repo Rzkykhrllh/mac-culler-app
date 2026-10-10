@@ -145,6 +145,8 @@ extension FolderSession {
 
     private func confirmAndTrash(_ targets: [PhotoItem], rejectsOnly: Bool) {
         guard !targets.isEmpty else { return }
+        // Like Finder: no question once the user said so (Settings ▸ General brings it back). Always undoable.
+        guard settings.confirmTrash else { Task { await trash(targets) }; return }
         let files = targets.reduce(0) { $0 + $1.files.allURLs.count }
         let noun = targets.count == 1 ? "photo" : "photos"
         let a = NSAlert()
@@ -157,7 +159,10 @@ extension FolderSession {
         let ok = a.addButton(withTitle: "Move to Trash")
         ok.hasDestructiveAction = true
         a.addButton(withTitle: "Cancel")
+        a.showsSuppressionButton = true
+        a.suppressionButton?.title = "Don’t ask again (⌘Z still brings photos back)"
         guard a.runModal() == .alertFirstButtonReturn else { return }
+        if a.suppressionButton?.state == .on { settings.confirmTrash = false }
         Task { await trash(targets) }
     }
 

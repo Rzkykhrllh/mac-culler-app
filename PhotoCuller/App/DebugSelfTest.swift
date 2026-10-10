@@ -597,6 +597,56 @@ enum DebugSelfTest {
         s.viewMode = .grid
         try? await Task.sleep(for: .milliseconds(1200))
         check(s.currentID == back && gridShowsCurrent() == name(back), "second round trip (\(name(s.currentID)), ring \(gridShowsCurrent()))")
+        // 4. Loupe block: ⇧→ ×3 selects 4 photos, X rejects all of them, the strip shows the block.
+        s.viewMode = .loupe
+        try? await Task.sleep(for: .milliseconds(600))
+        let startID = s.display[2].itemID
+        s.select(startID); s.selectionAnchor = startID
+        for _ in 0..<3 { _ = s.perform(KeyMap.Match(action: .next, advance: false, extend: true)) }
+        let block = Set(s.display[2...5].map(\.itemID))
+        check(s.selection == block, "loupe ⇧→ ×3 selects a block of 4 (\(s.selection.count))")
+        check(Set(s.markTargets.map(\.id)) == block, "marks target the whole block (\(s.markTargets.count))")
+        try? await Task.sleep(for: .milliseconds(400))
+        let lit = cells(content).filter { $0.isSelectedCell }.compactMap { $0.item?.id }
+        check(block.isSubset(of: Set(lit)), "filmstrip highlights the block (\(lit.count) lit)")
+        let before = block.compactMap { s.items[$0]?.metadata }
+        s.apply(.flag(.reject))
+        check(block.allSatisfy { s.items[$0]?.metadata.flag == .reject }, "X rejects all 4")
+        s.undo()
+        check(block.compactMap { s.items[$0]?.metadata } == before, "undo restores the 4")
+        s.move(1)
+        check(s.selection.count == 1, "a plain → ends the block")
+
+        // 5. ⇧-click in the filmstrip extends from the anchor.
+        s.select(s.display[1].itemID); s.selectionAnchor = s.display[1].itemID
+        s.selectRange(to: s.display[4].itemID)
+        check(s.selection == Set(s.display[1...4].map(\.itemID)), "filmstrip ⇧-click range (\(s.selection.count))")
+
+        // 6. Delete key → Move to Trash (fake Trash, no confirmation), then ⌘Z.
+        let savedConfirm = s.settings.confirmTrash, savedTrasher = s.app.operationLog.trasher
+        let bin = FileManager.default.temporaryDirectory.appendingPathComponent("ModeTestBin-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        s.settings.confirmTrash = false
+        s.app.operationLog.trasher = { url in
+            let dest = bin.appendingPathComponent(UUID().uuidString + url.lastPathComponent)
+            try FileManager.default.moveItem(at: url, to: dest)
+            return dest
+        }
+        s.select(s.display[0].itemID)
+        let victim = s.currentItem!
+        let urls = victim.files.allURLs
+        let total = s.items.count
+        _ = s.perform(KeyMap.Match(action: .trash, advance: false))
+        for _ in 0..<30 where s.items.count == total { try? await Task.sleep(for: .milliseconds(100)) }
+        check(s.items.count == total - 1 && urls.allSatisfy { !FileManager.default.fileExists(atPath: $0.path) }, "⌫ moved the photo to the Trash")
+        s.undo()
+        check(urls.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }, "⌘Z put it back")
+        for _ in 0..<30 where s.items.count != total { try? await Task.sleep(for: .milliseconds(100)) }
+        s.settings.confirmTrash = savedConfirm
+        s.app.operationLog.trasher = savedTrasher
+        try? FileManager.default.removeItem(at: bin)
+        s.viewMode = .grid
+
         // Context menu hand-off items (not triggered: that would import test files into the user's library).
         if let menu = PhotoContextMenu.make(s) {
             let titles = menu.items.map(\.title).filter { $0.contains("Lightroom") || $0 == "Open With" }
