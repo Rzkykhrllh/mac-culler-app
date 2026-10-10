@@ -31,6 +31,10 @@ extension FolderSession {
         case .compare:
             return compare.activeItemID.flatMap { items[$0] }.map { [$0] } ?? []
         case .loupe:
+            // A block selected in the filmstrip (⇧←/→, ⇧-click) is marked as a whole; otherwise the photo shown.
+            if selection.count > 1, let c = currentID, selection.contains(c) {
+                return selection.compactMap { items[$0] }.sorted { (displayIndex[$0.id] ?? 0) < (displayIndex[$1.id] ?? 0) }
+            }
             return currentItem.map { [$0] } ?? []
         case .grid:
             let ids = selection.isEmpty ? Set(currentID.map { [$0] } ?? []) : selection
@@ -67,7 +71,11 @@ extension FolderSession {
             if m != item.metadata { changes.append((item.id, item.metadata, m)) }
         }
         // Advance target is chosen before the display is rebuilt (a filter may hide the item just marked).
-        let nextID = advance ? neighbourID(offset: 1) : nil
+        // With a block marked, "advance" continues after the block, not inside it.
+        let lastIndex = targets.compactMap { displayIndex[$0.id] }.max()
+        let nextID: ItemID? = !advance ? nil
+            : targets.count > 1 ? lastIndex.flatMap { $0 + 1 < display.count ? display[$0 + 1].itemID : nil }
+            : neighbourID(offset: 1)
         if !changes.isEmpty {
             setMetadata(changes.map { ($0.id, $0.new) })
             pushUndo(.metadata(changes))

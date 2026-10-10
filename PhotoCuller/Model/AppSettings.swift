@@ -17,6 +17,8 @@ final class AppSettings {
     var comparePinBest: Bool { didSet { defaults.set(comparePinBest, forKey: Keys.pin) } }
     var compareSyncDefault: Bool { didSet { defaults.set(compareSyncDefault, forKey: Keys.sync) } }
     var syncFinderTags: Bool { didSet { defaults.set(syncFinderTags, forKey: Keys.finderTags) } }
+    /// Show the confirmation before Move to Trash (⌫ / ⌘⌫). It is undoable either way.
+    var confirmTrash: Bool { didSet { defaults.set(confirmTrash, forKey: Keys.confirmTrash) } }
     var cacheLimitGB: Double { didSet { defaults.set(cacheLimitGB, forKey: Keys.cacheLimit) } }
     var thumbnailSize: Double { didSet { defaults.set(thumbnailSize, forKey: Keys.thumbSize) } }
     var renamePresets: [RenamePreset] {
@@ -44,6 +46,7 @@ final class AppSettings {
         static let pin = "comparePinBest"
         static let sync = "compareSyncDefault"
         static let finderTags = "syncFinderTags"
+        static let confirmTrash = "confirmTrash"
         static let cacheLimit = "cacheLimitGB"
         static let thumbSize = "thumbnailSize"
         static let presets = "renamePresets"
@@ -70,6 +73,7 @@ final class AppSettings {
         comparePinBest = defaults.bool(forKey: Keys.pin)
         compareSyncDefault = defaults.bool(forKey: Keys.sync)
         syncFinderTags = defaults.bool(forKey: Keys.finderTags)
+        confirmTrash = defaults.object(forKey: Keys.confirmTrash) as? Bool ?? true
         cacheLimitGB = defaults.double(forKey: Keys.cacheLimit)
         thumbnailSize = defaults.double(forKey: Keys.thumbSize)
         showDebugOverlay = defaults.bool(forKey: Keys.debug)

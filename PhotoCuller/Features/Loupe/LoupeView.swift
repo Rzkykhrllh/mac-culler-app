@@ -36,8 +36,15 @@ struct LoupeView: View {
             }
             if session.showFilmstrip {
                 FilmstripView(session: session, entries: session.display, revision: session.displayRevision,
-                              currentID: session.currentID, highlighted: Set([session.currentID].compactMap { $0 })) { id in
-                    session.select(id)
+                              currentID: session.currentID,
+                              highlighted: session.selection.union([session.currentID].compactMap { $0 })) { id in
+                    let mods = NSEvent.modifierFlags
+                    if mods.contains(.shift) {
+                        session.selectRange(to: id, adding: mods.contains(.command))
+                    } else {
+                        session.select(id)
+                        session.selectionAnchor = id
+                    }
                 }
                 .padding(4)
                 .glassCard(18)

@@ -23,6 +23,7 @@ enum KeyAction: Equatable {
     case toggleClipping
     case zoomToSubject
     case sharpest
+    case trash
 }
 
 struct KeyBinding {
@@ -52,6 +53,8 @@ enum KeyCode {
     static let space: UInt16 = 49
     static let escape: UInt16 = 53
     static let f2: UInt16 = 120
+    static let delete: UInt16 = 51
+    static let forwardDelete: UInt16 = 117
 }
 
 enum KeyMap {
@@ -98,6 +101,8 @@ enum KeyMap {
             .init(key: .character("y"), action: .zoomToSubject, title: "Zoom to eyes / face / animal (again: next)"),
             .init(key: .character("b"), action: .sharpest, title: "Go to sharpest in stack"),
             .init(key: .code(KeyCode.f2), action: .rename, title: "Rename…"),
+            .init(key: .code(KeyCode.delete), action: .trash, title: "Move to Trash (undo with ⌘Z)"),
+            .init(key: .code(KeyCode.forwardDelete), action: .trash, title: "Move to Trash (undo with ⌘Z)"),
             .init(key: .code(KeyCode.escape), action: .escape, title: "Back"),
         ]
         return b
