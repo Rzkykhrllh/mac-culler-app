@@ -59,6 +59,16 @@ struct AppCommands: Commands {
                 .keyboardShortcut(.delete, modifiers: [.command, .shift])
                 .disabled(!canTrash)
             Divider()
+            Button(ExternalApps.lightroom.map { "Import to \($0.name)" } ?? "Import to Lightroom") {
+                if let s = session { s.importToLightroom(s.markTargets) }
+            }
+            .keyboardShortcut("l", modifiers: [.command, .control])
+            .disabled(!canAct || ExternalApps.lightroom == nil)
+            Button(ExternalApps.lightroom.map { "Import All Picks to \($0.name)" } ?? "Import All Picks to Lightroom") {
+                if let s = session { s.importToLightroom(s.picks) }
+            }
+            .keyboardShortcut("l", modifiers: [.command, .control, .shift])
+            .disabled(!canAct || ExternalApps.lightroom == nil)
             Button("Reveal in Finder") {
                 if let s = session { NSWorkspace.shared.activateFileViewerSelecting(s.markTargets.flatMap(\.files.allURLs)) }
             }

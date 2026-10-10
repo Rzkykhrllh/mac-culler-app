@@ -597,6 +597,13 @@ enum DebugSelfTest {
         s.viewMode = .grid
         try? await Task.sleep(for: .milliseconds(1200))
         check(s.currentID == back && gridShowsCurrent() == name(back), "second round trip (\(name(s.currentID)), ring \(gridShowsCurrent()))")
+        // Context menu hand-off items (not triggered: that would import test files into the user's library).
+        if let menu = PhotoContextMenu.make(s) {
+            let titles = menu.items.map(\.title).filter { $0.contains("Lightroom") || $0 == "Open With" }
+            let openWith = menu.items.first { $0.title == "Open With" }?.submenu?.items.map(\.title) ?? []
+            Log.session.info("MODETEST menu: \(titles, privacy: .public); Open With: \(openWith, privacy: .public)")
+        }
+        Log.session.info("MODETEST lightroom: \(ExternalApps.lightroom?.name ?? "none", privacy: .public), picks \(s.picks.count)")
         Log.session.info("MODETEST done")
     }
 

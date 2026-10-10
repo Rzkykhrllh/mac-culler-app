@@ -171,6 +171,7 @@ struct ShortcutsHelpView: View {
                 row("Compare with 2 / 3 / 4 slots", "⌥2 / ⌥3 / ⌥4")
                 row("Move… / Copy…", "⇧⌘M / ⇧⌘C")
                 row("Move to Trash / all rejects to Trash", "⌘⌫ / ⇧⌘⌫")
+                row("Import to Lightroom / all picks", "⌃⌘L / ⌃⇧⌘L")
                 row("Reveal in Finder", "⇧⌘R")
                 row("Find / clear filters", "⌘F / ⌥⌘F")
                 row("Thumbnail size", "⌘= / ⌘−")

@@ -21,6 +21,7 @@
 		38A4090A38E5DA172CF8E5F0 /* FolderSession+FileOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCFA2AD9A4D0195A9F635C58 /* FolderSession+FileOps.swift */; };
 		3BC4A84C835AA5CEE9A5C30E /* FolderSession+Marking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 617E518A121A2989ED623172 /* FolderSession+Marking.swift */; };
 		483E1931AC3930C225572018 /* FolderSession+Keyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CFD91841A736D2057C95734 /* FolderSession+Keyboard.swift */; };
+		4C7534E2D0C862398A28B4E4 /* FolderSession+External.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE98313A8765BD89C60378A /* FolderSession+External.swift */; };
 		501A4CBFDEE5286E37AAA91F /* PhotoContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA11F099D76108D79CC03241 /* PhotoContextMenu.swift */; };
 		5046B573401AE35A47AD4EF2 /* ThumbnailCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3B22C1C607B8B0DA285492 /* ThumbnailCell.swift */; };
 		55BFBD6774FDF00808C04C2C /* CullerKit in Frameworks */ = {isa = PBXBuildFile; productRef = B43CE62A7298C2877484F302 /* CullerKit */; };
@@ -94,6 +95,7 @@
 		9A79D66E6B8813C4C07693DB /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		9DC4D0EC66E010A702889F5E /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		9E4BD60901C993AB83711D73 /* SlotImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlotImageLoader.swift; sourceTree = "<group>"; };
+		9EE98313A8765BD89C60378A /* FolderSession+External.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FolderSession+External.swift"; sourceTree = "<group>"; };
 		A0C0D648E420ED9AFC49DEF5 /* FolderSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderSession.swift; sourceTree = "<group>"; };
 		A742E54B3C906177D0A5C17A /* FilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterBar.swift; sourceTree = "<group>"; };
 		B63F8E06C8844F82FC55F280 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -247,6 +249,7 @@
 				7F38619D88E7762C952D8378 /* CompareState.swift */,
 				A0C0D648E420ED9AFC49DEF5 /* FolderSession.swift */,
 				CF1CB06B042E883374E875E7 /* FolderSession+Display.swift */,
+				9EE98313A8765BD89C60378A /* FolderSession+External.swift */,
 				FCFA2AD9A4D0195A9F635C58 /* FolderSession+FileOps.swift */,
 				FE6D072D943A4F714F83D705 /* FolderSession+Focus.swift */,
 				3CFD91841A736D2057C95734 /* FolderSession+Keyboard.swift */,
@@ -431,6 +434,7 @@
 				D2F51378364132568295A139 /* DebugSelfTest.swift in Sources */,
 				2CF25C27E8145ED89840B13B /* FilterBar.swift in Sources */,
 				CE7D0D437B8595632D538990 /* FolderSession+Display.swift in Sources */,
+				4C7534E2D0C862398A28B4E4 /* FolderSession+External.swift in Sources */,
 				38A4090A38E5DA172CF8E5F0 /* FolderSession+FileOps.swift in Sources */,
 				58455F5B0A9C753982E44F16 /* FolderSession+Focus.swift in Sources */,
 				483E1931AC3930C225572018 /* FolderSession+Keyboard.swift in Sources */,
