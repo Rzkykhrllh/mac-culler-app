@@ -25,7 +25,7 @@ struct GettingStartedView: View {
                  text: "Many cameras save a RAW and a JPG of every shot. RAW+JPG shows them as one photo and marks both files. Separate shows each file on its own: a broken-chain badge marks files that have a partner, and the partner of each selected photo gets a white dashed outline and a white “PAIR” badge. JPG and RAW show only one kind. True RAW renders the RAW without the camera's look; Camera Preview shows the camera's own rendering.",
                  visual: AnyView(ModesVisual())),
             Page(symbol: "keyboard", title: "Mark with the keyboard",
-                 text: "P pick, X reject, U unflag, 0–5 stars, 6–9 color labels, M note. Add ⇧ to jump to the next photo, or turn on Caps Lock to always advance. A big confirmation shows what you set. Orange outline = the selected photo; a lighter tile with buttons = under the mouse. With the mouse: hover a thumbnail to pick, reject or rate it, or right-click.",
+                 text: "P pick, X reject, U unflag, 0–5 stars, 6–9 color labels, M note. Add ⇧ to jump to the next photo, or turn on Caps Lock to always advance. A big confirmation shows what you set. Orange outline = the selected photo; a lighter tile with buttons = under the mouse. With the mouse: hover a thumbnail to pick, reject or rate it, or right-click. Prefer other keys? Settings ▸ Shortcuts (there is a left-hand preset).",
                  visual: AnyView(KeysVisual())),
             Page(symbol: "square.stack", title: "Stacks and compare",
                  text: "Stacks group photos: Bursts (shot within a second) or Similar (photos that look alike). S expands a stack. C compares photos side by side — drag from the filmstrip onto a side, Tab switches sides, Z zooms both to 100% together.",

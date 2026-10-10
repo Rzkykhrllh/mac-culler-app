@@ -13,15 +13,23 @@ struct Viewport: Equatable {
 }
 
 /// Keeps the zoomable views of the loupe / compare slots together and synchronizes them.
+@Observable
 final class ViewportHub {
     private final class Weak { weak var view: ZoomScrollView?; init(_ v: ZoomScrollView) { view = v } }
-    private var views: [Int: Weak] = [:]
+    @ObservationIgnored private var views: [Int: Weak] = [:]
+    /// Current zoom in percent of 100% (nil while fit), for the on-image Fit button.
+    private(set) var zoomPercent: Int?
     /// Per-slot offset from the shared center, built up by ⌥-dragging (temporary independent pan).
-    private var offsets: [Int: CGPoint] = [:]
-    private var applying = false
+    @ObservationIgnored private var offsets: [Int: CGPoint] = [:]
+    @ObservationIgnored private var applying = false
     var sync = true
     /// Last viewport, re-applied when the image in a slot changes so zoom/position persist while culling a burst.
-    private(set) var lastViewport: Viewport = .fit
+    @ObservationIgnored private(set) var lastViewport: Viewport = .fit {
+        didSet {
+            let p: Int? = lastViewport.isFit ? nil : Int((lastViewport.zoom * 100).rounded())
+            if p != zoomPercent { zoomPercent = p }
+        }
+    }
 
     func register(_ v: ZoomScrollView, slot: Int) {
         views[slot] = Weak(v)
@@ -40,6 +48,15 @@ final class ViewportHub {
     }
 
     func resetOffsets() { offsets.removeAll() }
+
+    /// ⌘0 / the Fit button: every slot back to the whole photo, and new photos open fit too.
+    func fitAll() {
+        offsets.removeAll()
+        lastViewport = .fit
+        applying = true
+        for (_, w) in views { w.view?.apply(.fit) }
+        applying = false
+    }
 
     /// Zooms every given slot to its own point (e.g. each photo's eyes). Offsets are set so synced panning
     /// afterwards keeps each slot on its subject.

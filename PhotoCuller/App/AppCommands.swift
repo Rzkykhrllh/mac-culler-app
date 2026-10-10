@@ -14,6 +14,7 @@ struct AppCommands: Commands {
     private var canTrash: Bool { canAct && !KeyboardController.isEditingText }
 
     var body: some Commands {
+        let _ = ShortcutStore.shared.bindings   // menus follow custom shortcuts
         CommandGroup(replacing: .newItem) {
             Button("New Tab") { app.newTab() }
                 .keyboardShortcut("t")
@@ -43,7 +44,7 @@ struct AppCommands: Commands {
                 .disabled(session == nil)
             Divider()
             Button("Rename…") { session?.activeSheet = .rename }
-                .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF2FunctionKey)!)), modifiers: [])
+                .keyboardShortcut(KeyMap.menuShortcut("file.rename"))
                 .disabled(!canAct)
             Button("Move…") { session?.activeSheet = .move }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
@@ -105,66 +106,66 @@ struct AppCommands: Commands {
 
         CommandMenu("Photo") {
             Group {
-                Button("Pick") { session?.apply(.flag(.pick)) }.keyboardShortcut("p", modifiers: [])
-                Button("Reject") { session?.apply(.flag(.reject)) }.keyboardShortcut("x", modifiers: [])
-                Button("Unflag") { session?.apply(.flag(.none)) }.keyboardShortcut("u", modifiers: [])
-                Button("Pick and Next") { session?.apply(.flag(.pick), advance: true) }.keyboardShortcut("p", modifiers: .shift)
-                Button("Reject and Next") { session?.apply(.flag(.reject), advance: true) }.keyboardShortcut("x", modifiers: .shift)
+                Button("Pick") { session?.apply(.flag(.pick)) }.keyboardShortcut(KeyMap.menuShortcut("mark.pick"))
+                Button("Reject") { session?.apply(.flag(.reject)) }.keyboardShortcut(KeyMap.menuShortcut("mark.reject"))
+                Button("Unflag") { session?.apply(.flag(.none)) }.keyboardShortcut(KeyMap.menuShortcut("mark.unflag"))
+                Button("Pick and Next") { session?.apply(.flag(.pick), advance: true) }.keyboardShortcut(KeyMap.menuShortcut("mark.pick", shift: true))
+                Button("Reject and Next") { session?.apply(.flag(.reject), advance: true) }.keyboardShortcut(KeyMap.menuShortcut("mark.reject", shift: true))
             }
             .disabled(!canAct)
             Divider()
             Menu("Rating") {
                 ForEach(0...5, id: \.self) { r in
                     Button(r == 0 ? "No Rating" : String(repeating: "★", count: r)) { session?.apply(.rating(r)) }
-                        .keyboardShortcut(KeyEquivalent(Character("\(r)")), modifiers: [])
+                        .keyboardShortcut(KeyMap.menuShortcut("rating.\(r)"))
                 }
             }
             .disabled(!canAct)
             Menu("Color Label") {
-                Button("Red") { session?.apply(.toggleLabel(.red)) }.keyboardShortcut("6", modifiers: [])
-                Button("Yellow") { session?.apply(.toggleLabel(.yellow)) }.keyboardShortcut("7", modifiers: [])
-                Button("Green") { session?.apply(.toggleLabel(.green)) }.keyboardShortcut("8", modifiers: [])
-                Button("Blue") { session?.apply(.toggleLabel(.blue)) }.keyboardShortcut("9", modifiers: [])
-                Button("Purple") { session?.apply(.toggleLabel(.purple)) }.keyboardShortcut("9", modifiers: .option)
+                Button("Red") { session?.apply(.toggleLabel(.red)) }.keyboardShortcut(KeyMap.menuShortcut("label.red"))
+                Button("Yellow") { session?.apply(.toggleLabel(.yellow)) }.keyboardShortcut(KeyMap.menuShortcut("label.yellow"))
+                Button("Green") { session?.apply(.toggleLabel(.green)) }.keyboardShortcut(KeyMap.menuShortcut("label.green"))
+                Button("Blue") { session?.apply(.toggleLabel(.blue)) }.keyboardShortcut(KeyMap.menuShortcut("label.blue"))
+                Button("Purple") { session?.apply(.toggleLabel(.purple)) }.keyboardShortcut(KeyMap.menuShortcut("label.purple"))
                 Divider()
-                Button("No Label") { session?.apply(.setLabel(.none)) }.keyboardShortcut("0", modifiers: .option)
+                Button("No Label") { session?.apply(.setLabel(.none)) }.keyboardShortcut(KeyMap.menuShortcut("label.clear"))
             }
             .disabled(!canAct)
             Button("Edit Note…") { session?.beginNoteEditing() }
-                .keyboardShortcut("m", modifiers: [])
+                .keyboardShortcut(KeyMap.menuShortcut("mark.note"))
                 .disabled(!canAct)
             Divider()
             Group {
                 Button("Next Photo") { session?.viewMode == .compare ? session?.stepActiveSlot(1) : session?.move(1) }
-                    .keyboardShortcut(.rightArrow, modifiers: [])
+                    .keyboardShortcut(KeyMap.menuShortcut("nav.next"))
                 Button("Previous Photo") { session?.viewMode == .compare ? session?.stepActiveSlot(-1) : session?.move(-1) }
-                    .keyboardShortcut(.leftArrow, modifiers: [])
+                    .keyboardShortcut(KeyMap.menuShortcut("nav.previous"))
                 Button("Next Unflagged") { session?.moveToUnflagged(1) }
-                    .keyboardShortcut(.rightArrow, modifiers: .option)
+                    .keyboardShortcut(KeyMap.menuShortcut("nav.nextUnflagged"))
                 Button("Previous Unflagged") { session?.moveToUnflagged(-1) }
-                    .keyboardShortcut(.leftArrow, modifiers: .option)
+                    .keyboardShortcut(KeyMap.menuShortcut("nav.previousUnflagged"))
             }
             .disabled(!canAct)
             Divider()
             Menu("Stacks") {
                 Toggle("Stacks On", isOn: Binding(get: { app.settings.stackBursts }, set: { app.setStackBursts($0) }))
-                    .keyboardShortcut("s", modifiers: .shift)
+                    .keyboardShortcut(KeyMap.fixedShortcut("s", .shift))
                 Divider()
                 Toggle("Group Bursts (Time)", isOn: Binding(get: { app.stackChoice == .bursts }, set: { if $0 { app.setStackChoice(.bursts) } }))
                 Toggle("Group Similar Photos", isOn: Binding(get: { app.stackChoice == .similar }, set: { if $0 { app.setStackChoice(.similar) } }))
                 Button("Switch Bursts ↔ Similar") { app.setStackChoice(app.stackChoice == .similar ? .bursts : .similar) }
-                    .keyboardShortcut("s", modifiers: .option)
+                    .keyboardShortcut(KeyMap.fixedShortcut("s", .option))
                 Divider()
                 Button("Stricter Similarity") { app.adjustSimilarity(-0.05) }
-                    .keyboardShortcut("[", modifiers: .option)
+                    .keyboardShortcut(KeyMap.fixedShortcut("[", .option))
                 Button("Looser Similarity") { app.adjustSimilarity(0.05) }
-                    .keyboardShortcut("]", modifiers: .option)
+                    .keyboardShortcut(KeyMap.fixedShortcut("]", .option))
             }
             Group {
                 Button("Expand / Collapse Selected Stacks") { session?.toggleSelectedStacks() }
-                    .keyboardShortcut("s", modifiers: [])
+                    .keyboardShortcut(KeyMap.menuShortcut("stack.toggle"))
                 Button("Go to Sharpest in Stack") { session?.goToSharpest() }
-                    .keyboardShortcut("b", modifiers: [])
+                    .keyboardShortcut(KeyMap.menuShortcut("focus.sharpest"))
                 Button("Expand All Stacks") { session?.expandAllStacks(true) }
                     .keyboardShortcut(.rightArrow, modifiers: [.command, .option])
                 Button("Collapse All Stacks") { session?.expandAllStacks(false) }
@@ -179,14 +180,16 @@ struct AppCommands: Commands {
 
         CommandGroup(before: .toolbar) {
             Group {
-                Button("Grid") { session?.viewMode = .grid }.keyboardShortcut("g", modifiers: [])
-                Button("Loupe") { if session?.currentID != nil { session?.viewMode = .loupe } }.keyboardShortcut("e", modifiers: [])
-                Button("Compare") { session?.enterCompare() }.keyboardShortcut("c", modifiers: [])
+                Button("Grid") { session?.viewMode = .grid }.keyboardShortcut(KeyMap.menuShortcut("view.grid"))
+                Button("Loupe") { if session?.currentID != nil { session?.viewMode = .loupe } }.keyboardShortcut(KeyMap.menuShortcut("view.loupe"))
+                Button("Compare") { session?.enterCompare() }.keyboardShortcut(KeyMap.menuShortcut("view.compare"))
                 Button("Toggle 100% Zoom") {
                     guard let s = session else { return }
                     s.viewports.toggleZoom(slot: s.viewMode == .compare ? s.compare.active : 0)
                 }
-                .keyboardShortcut("z", modifiers: [])
+                .keyboardShortcut(KeyMap.menuShortcut("view.zoom"))
+                Button("Zoom to Fit") { session?.viewports.fitAll() }
+                    .keyboardShortcut("0", modifiers: .command)
             }
             .disabled(!canAct)
             Menu("RAW + JPEG") {
@@ -215,30 +218,30 @@ struct AppCommands: Commands {
                         if session?.viewMode != .compare { session?.enterCompare() }
                         session?.compare.setSlotCount(n)
                     }
-                    .keyboardShortcut(KeyEquivalent(Character("\(n)")), modifiers: .option)
+                    .keyboardShortcut(KeyMap.fixedShortcut(Character("\(n)"), .option))
                 }
                 Divider()
                 Toggle("Sync Zoom & Pan", isOn: Binding(get: { session?.compare.syncZoom ?? true }, set: { session?.compare.syncZoom = $0 }))
-                    .keyboardShortcut("z", modifiers: .option)
+                    .keyboardShortcut(KeyMap.menuShortcut("compare.syncZoom"))
                 Toggle("Pin Current Best", isOn: Binding(get: { session?.compare.pinBest ?? false }, set: { session?.compare.pinBest = $0 }))
-                    .keyboardShortcut("p", modifiers: .option)
+                    .keyboardShortcut(KeyMap.menuShortcut("compare.pinBest"))
                 Toggle("Filmstrip Shows All Photos", isOn: Binding(get: { session?.compare.stripShowsAll ?? false },
                                                                    set: { session?.setCompareStripShowsAll($0) }))
-                    .keyboardShortcut("a", modifiers: .option)
+                    .keyboardShortcut(KeyMap.menuShortcut("compare.stripAll"))
             }
             .disabled(session == nil)
             Divider()
             Group {
                 Toggle("Info Panel", isOn: Binding(get: { session?.showInfoPanel ?? false }, set: { session?.showInfoPanel = $0 }))
-                    .keyboardShortcut("i", modifiers: [])
+                    .keyboardShortcut(KeyMap.menuShortcut("view.info"))
                 Toggle("Histogram", isOn: Binding(get: { session?.showHistogram ?? false }, set: { session?.showHistogram = $0 }))
-                    .keyboardShortcut("h", modifiers: [])
+                    .keyboardShortcut(KeyMap.menuShortcut("view.histogram"))
                 Toggle("Focus Peaking", isOn: Binding(get: { session?.showPeaking ?? false }, set: { session?.showPeaking = $0 }))
-                    .keyboardShortcut("f", modifiers: [])
+                    .keyboardShortcut(KeyMap.menuShortcut("focus.peaking"))
                 Toggle("Highlight / Shadow Clipping", isOn: Binding(get: { session?.showClipping ?? false }, set: { session?.showClipping = $0 }))
-                    .keyboardShortcut("j", modifiers: [])
+                    .keyboardShortcut(KeyMap.menuShortcut("focus.clipping"))
                 Button("Zoom to Eyes / Face / Animal") { session?.zoomToSubject() }
-                    .keyboardShortcut("y", modifiers: [])
+                    .keyboardShortcut(KeyMap.menuShortcut("focus.subject"))
                 Toggle("Filmstrip", isOn: Binding(get: { session?.showFilmstrip ?? true }, set: { session?.showFilmstrip = $0 }))
                     .keyboardShortcut("b", modifiers: [.command, .option])
             }

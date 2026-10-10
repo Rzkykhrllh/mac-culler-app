@@ -20,6 +20,12 @@ struct LoupeView: View {
                               onDropItem: { session.select($0) },
                               peaking: loader.peaking, clipping: loader.clipping)
                 ImageStateOverlay(loader: loader)
+                VStack {
+                    HStack { Spacer(); FitButton(hub: session.viewports) }
+                    Spacer()
+                }
+                .padding(10)
+                .animation(.smooth(duration: 0.15), value: session.viewports.zoomPercent)
                 if let item = session.currentItem {
                     VStack {
                         Spacer()

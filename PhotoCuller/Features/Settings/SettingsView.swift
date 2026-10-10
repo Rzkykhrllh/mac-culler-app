@@ -9,11 +9,12 @@ struct SettingsView: View {
         TabView {
             GeneralSettings().tabItem { Label("General", systemImage: "gearshape") }
             AppearanceSettings().tabItem { Label("Appearance", systemImage: "paintpalette") }
+            ShortcutsSettings().tabItem { Label("Shortcuts", systemImage: "keyboard") }
             CompareSettings().tabItem { Label("Compare", systemImage: "rectangle.split.2x1") }
             CacheSettings().tabItem { Label("Cache", systemImage: "internaldrive") }
             RenamePresetsSettings().tabItem { Label("Rename", systemImage: "pencil") }
         }
-        .frame(width: 540, height: 420)
+        .frame(width: 580, height: 520)
     }
 }
 

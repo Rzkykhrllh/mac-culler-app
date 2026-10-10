@@ -298,6 +298,16 @@ enum DebugSelfTest {
             win.orderOut(nil)
         }
         await render(AboutView(), "about")
+        await render(ShortcutsSettings().frame(width: 580, height: 520).background(Color(white: 0.12)), "shortcuts-settings")
+        // Zoomed loupe with the Fit button.
+        s.viewMode = .loupe
+        try? await Task.sleep(for: .seconds(1.5))
+        s.viewports.toggleZoom(slot: 0)
+        try? await Task.sleep(for: .milliseconds(600))
+        await snap("loupe-zoomed")
+        s.viewports.fitAll()
+        s.viewMode = .grid
+        try? await Task.sleep(for: .milliseconds(500))
         await render(AppearanceSettings().frame(width: 540, height: 420).background(Color(white: 0.12)), "appearance")
         // Undo the demo marks.
         for _ in 0..<(cmds.count + 1) { s.undo() }
@@ -655,6 +665,56 @@ enum DebugSelfTest {
         }
         Log.session.info("MODETEST lightroom: \(ExternalApps.lightroom?.name ?? "none", privacy: .public), picks \(s.picks.count)")
         Log.session.info("MODETEST done")
+    }
+
+    /// `-shortcutTest`: custom keys (preset, conflicts, menus) and the zoom Fit control. Restores the user's keys.
+    static func runShortcuts(_ s: FolderSession) async {
+        while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        func check(_ ok: Bool, _ what: String) { Log.session.info("KEYTEST \(ok ? "ok  " : "FAIL", privacy: .public) \(what, privacy: .public)") }
+        let store = ShortcutStore.shared
+        let saved = store.overrides
+        defer { store.debugRestore(saved) }
+        func press(_ chars: String, _ code: UInt16, _ mods: NSEvent.ModifierFlags = []) -> KeyAction? {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: mods, timestamp: 0, windowNumber: 0, context: nil,
+                             characters: chars, charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)
+                .flatMap { KeyMap.match($0)?.action }
+        }
+        store.resetAll()
+        check(press("p", 35) == .mark(.flag(.pick)) && press("x", 7) == .mark(.flag(.reject)), "defaults: P pick, X reject")
+
+        store.applyLeftHandPreset()
+        check(press("a", 0) == .mark(.flag(.pick)), "left hand: A picks")
+        check(press("s", 1) == .mark(.flag(.none)), "left hand: S unflags")
+        check(press("d", 2) == .mark(.flag(.reject)), "left hand: D rejects")
+        check(press("w", 13) == .toggleStack, "left hand: W expands stacks")
+        check(press("p", 35) == nil, "P does nothing any more")
+        check(KeyMap.menuShortcut("mark.pick")?.key == KeyEquivalent("a"), "menu shows A for Pick")
+        check(KeyMap.fixedShortcut("s", .shift) == nil, "menu's ⇧S (Stacks On) gives way to Unflag and next")
+        check(KeyMap.label("mark.reject") == "D", "help sheet label for Reject is D")
+
+        // Conflict: give Pick the key of Reject.
+        let taken = store.assign("mark.pick", key: .character("d"), option: false)
+        check(taken == ["Reject"] && KeyMap.binding("mark.reject") == nil && press("d", 2) == .mark(.flag(.pick)),
+              "taking D from Reject unassigns Reject (\(taken))")
+        store.reset("mark.reject")
+        check(press("x", 7) == .mark(.flag(.reject)), "reset gives Reject X back")
+        // ⌥ combination.
+        store.assign("mark.unflag", key: .character("k"), option: true)
+        check(press("k", 40, .option) == .mark(.flag(.none)) && press("k", 40) == nil, "⌥K works, plain K does not")
+        store.resetAll()
+        check(store.overrides.isEmpty && press("p", 35) == .mark(.flag(.pick)), "reset all")
+
+        // Zoom: 100% then Fit.
+        s.viewMode = .loupe
+        try? await Task.sleep(for: .seconds(2))
+        s.viewports.toggleZoom(slot: 0)
+        try? await Task.sleep(for: .milliseconds(500))
+        check(s.viewports.zoomPercent == 100, "Z zooms to 100% (\(s.viewports.zoomPercent.map(String.init) ?? "fit"))")
+        s.viewports.fitAll()
+        try? await Task.sleep(for: .milliseconds(300))
+        check(s.viewports.zoomPercent == nil && s.viewports.lastViewport.isFit, "Fit / ⌘0 brings back the whole photo")
+        s.viewMode = .grid
+        Log.session.info("KEYTEST done")
     }
 
     static func run(_ s: FolderSession) async {

@@ -22,6 +22,13 @@ func ActionMenuItem(_ title: String, key: String = "", modifiers: NSEvent.Modifi
     return item
 }
 
+/// Menu item showing the current (possibly custom) key of a key-map action.
+@MainActor
+func ActionMenuItem(_ title: String, shortcut id: String, enabled: Bool = true, handler: @escaping () -> Void) -> NSMenuItem {
+    let k = KeyMap.menuKey(id)
+    return ActionMenuItem(title, key: k.key, modifiers: k.modifiers, enabled: enabled, handler: handler)
+}
+
 /// Right-click menu for the photos a command would act on (grid selection, loupe photo, active compare slot).
 enum PhotoContextMenu {
     static func make(_ s: FolderSession) -> NSMenu? {
@@ -39,41 +46,38 @@ enum PhotoContextMenu {
 
         func check(_ item: NSMenuItem, _ on: Bool) -> NSMenuItem { item.state = on ? .on : .off; return item }
 
-        menu.addItem(check(ActionMenuItem("Pick", key: "p") { s.apply(.flag(.pick)) }, single?.flag == .pick))
-        menu.addItem(check(ActionMenuItem("Reject", key: "x") { s.apply(.flag(.reject)) }, single?.flag == .reject))
-        menu.addItem(check(ActionMenuItem("Unflag", key: "u") { s.apply(.flag(.none)) }, single?.flag == Flag.none))
+        menu.addItem(check(ActionMenuItem("Pick", shortcut: "mark.pick") { s.apply(.flag(.pick)) }, single?.flag == .pick))
+        menu.addItem(check(ActionMenuItem("Reject", shortcut: "mark.reject") { s.apply(.flag(.reject)) }, single?.flag == .reject))
+        menu.addItem(check(ActionMenuItem("Unflag", shortcut: "mark.unflag") { s.apply(.flag(.none)) }, single?.flag == Flag.none))
 
         let rating = NSMenu()
         for r in 0...5 {
-            rating.addItem(check(ActionMenuItem(r == 0 ? "No Rating" : String(repeating: "★", count: r), key: "\(r)") { s.apply(.rating(r)) },
+            rating.addItem(check(ActionMenuItem(r == 0 ? "No Rating" : String(repeating: "★", count: r), shortcut: "rating.\(r)") { s.apply(.rating(r)) },
                                  single?.rating == r))
         }
         menu.addItem(submenu("Rating", rating))
 
         let labels = NSMenu()
-        let keyed: [(ColorLabel, String, NSEvent.ModifierFlags)] = [
-            (.red, "6", []), (.yellow, "7", []), (.green, "8", []), (.blue, "9", []), (.purple, "9", [.option]),
-        ]
-        for (l, k, m) in keyed {
-            let item = check(ActionMenuItem(l.displayName, key: k, modifiers: m) { s.apply(.toggleLabel(l)) }, single?.label == l)
+        for l in [ColorLabel.red, .yellow, .green, .blue, .purple] {
+            let item = check(ActionMenuItem(l.displayName, shortcut: "label.\(l.rawValue)") { s.apply(.toggleLabel(l)) }, single?.label == l)
             item.image = swatch(l)
             labels.addItem(item)
         }
         labels.addItem(.separator())
-        labels.addItem(ActionMenuItem("No Label", key: "0", modifiers: [.option]) { s.apply(.setLabel(.none)) })
+        labels.addItem(ActionMenuItem("No Label", shortcut: "label.clear") { s.apply(.setLabel(.none)) })
         menu.addItem(submenu("Color Label", labels))
-        menu.addItem(ActionMenuItem(targets.count == 1 && targets[0].metadata.hasNote ? "Edit Note…" : "Add Note…", key: "m") { s.beginNoteEditing() })
+        menu.addItem(ActionMenuItem(targets.count == 1 && targets[0].metadata.hasNote ? "Edit Note…" : "Add Note…", shortcut: "mark.note") { s.beginNoteEditing() })
 
         menu.addItem(.separator())
         if s.viewMode != .loupe {
-            menu.addItem(ActionMenuItem("Open in Loupe", key: "e") {
+            menu.addItem(ActionMenuItem("Open in Loupe", shortcut: "view.loupe") {
                 if let first = targets.first { s.select(first.id); s.viewMode = .loupe }
             })
         }
         if s.viewMode != .compare {
-            menu.addItem(ActionMenuItem(targets.count > 1 ? "Compare Selected" : "Compare", key: "c") { s.enterCompare() })
+            menu.addItem(ActionMenuItem(targets.count > 1 ? "Compare Selected" : "Compare", shortcut: "view.compare") { s.enterCompare() })
         } else {
-            menu.addItem(ActionMenuItem("Back to Grid", key: "g") { s.viewMode = .grid })
+            menu.addItem(ActionMenuItem("Back to Grid", shortcut: "view.grid") { s.viewMode = .grid })
         }
         let ids = Set(targets.map(\.id)).union(s.selection)
         let stacks = Set(ids.compactMap { s.stackOf[$0] })
@@ -81,17 +85,17 @@ enum PhotoContextMenu {
             let expand = stacks.contains { !s.expandedStacks.contains($0) }
             let title = expand ? (stacks.count > 1 ? "Expand \(stacks.count) Stacks" : "Expand Stack")
                                : (stacks.count > 1 ? "Collapse \(stacks.count) Stacks" : "Collapse Stack")
-            menu.addItem(ActionMenuItem(title, key: "s") { s.toggleSelectedStacks() })
+            menu.addItem(ActionMenuItem(title, shortcut: "stack.toggle") { s.toggleSelectedStacks() })
         }
 
         if s.viewMode != .grid {
-            menu.addItem(ActionMenuItem("Zoom to Eyes / Face", key: "y") { s.zoomToSubject() })
+            menu.addItem(ActionMenuItem("Zoom to Eyes / Face", shortcut: "focus.subject") { s.zoomToSubject() })
         }
         if !stacks.isEmpty {
-            menu.addItem(ActionMenuItem("Go to Sharpest in Stack", key: "b") { s.goToSharpest() })
+            menu.addItem(ActionMenuItem("Go to Sharpest in Stack", shortcut: "focus.sharpest") { s.goToSharpest() })
         }
-        menu.addItem(check(ActionMenuItem("Focus Peaking", key: "f") { s.showPeaking.toggle() }, s.showPeaking))
-        menu.addItem(check(ActionMenuItem("Clipping", key: "j") { s.showClipping.toggle() }, s.showClipping))
+        menu.addItem(check(ActionMenuItem("Focus Peaking", shortcut: "focus.peaking") { s.showPeaking.toggle() }, s.showPeaking))
+        menu.addItem(check(ActionMenuItem("Clipping", shortcut: "focus.clipping") { s.showClipping.toggle() }, s.showClipping))
 
         // Hand-off: Lightroom import right here, any other editor under Open With.
         menu.addItem(.separator())
@@ -112,17 +116,17 @@ enum PhotoContextMenu {
         menu.addItem(submenu("Open With", openWith))
 
         menu.addItem(.separator())
-        menu.addItem(ActionMenuItem("Rename…", key: String(UnicodeScalar(NSF2FunctionKey)!)) { s.activeSheet = .rename })
+        menu.addItem(ActionMenuItem("Rename…", shortcut: "file.rename") { s.activeSheet = .rename })
         menu.addItem(ActionMenuItem("Move…", key: "m", modifiers: [.command, .shift]) { s.activeSheet = .move })
         menu.addItem(ActionMenuItem("Copy…", key: "c", modifiers: [.command, .shift]) { s.activeSheet = .copy })
 
         menu.addItem(.separator())
         menu.addItem(ActionMenuItem(targets.count > 1 ? "Move \(targets.count) Photos to Trash…" : "Move to Trash…",
-                                    key: String(UnicodeScalar(NSBackspaceCharacter)!), modifiers: [.command]) { s.trashSelection() })
+                                    shortcut: "file.trash") { s.trashSelection() })
         menu.addItem(ActionMenuItem("Reveal in Finder", key: "r", modifiers: [.command, .shift]) {
             NSWorkspace.shared.activateFileViewerSelecting(targets.flatMap(\.files.allURLs))
         })
-        menu.addItem(check(ActionMenuItem("Show Info", key: "i") { s.showInfoPanel.toggle() }, s.showInfoPanel))
+        menu.addItem(check(ActionMenuItem("Show Info", shortcut: "view.info") { s.showInfoPanel.toggle() }, s.showInfoPanel))
         return menu
     }
 
