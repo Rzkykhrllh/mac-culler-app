@@ -108,6 +108,13 @@ final class FolderSession {
     var fileOperation: FileOperationProgress?
     @ObservationIgnored var currentCancel: CancelToken?
     var activeSheet: SessionSheet?
+    /// Loupe crop editor open; `cropDraft` is the crop being edited (committed with Return / Done).
+    var cropEditing = false
+    var cropDraft: CropSpec?
+    @ObservationIgnored var cropItemID: ItemID?
+    /// Photos the export sheet works on, and the files the last export wrote.
+    @ObservationIgnored var exportTargets: [ItemID] = []
+    @ObservationIgnored var lastExports: [URL] = []
     /// Zoom controllers of the visible image views (loupe = slot 0).
     @ObservationIgnored let viewports = ViewportHub()
     /// Columns currently laid out in the grid (for ↑/↓).

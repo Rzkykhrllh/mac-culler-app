@@ -722,6 +722,87 @@ enum DebugSelfTest {
         Log.session.info("KEYTEST done")
     }
 
+    /// `-editTest`: crop / straighten, undo, cancel, export (run on a throwaway copy: crops are written to XMP).
+    static func runEdit(_ s: FolderSession) async {
+        while s.phase != .ready || s.indexing != nil { try? await Task.sleep(for: .milliseconds(100)) }
+        guard let w = KeyboardController.shared.mainWindow else { return }
+        func check(_ ok: Bool, _ what: String) { Log.session.info("EDITTEST \(ok ? "ok  " : "FAIL", privacy: .public) \(what, privacy: .public)") }
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Snapshots")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        func snap(_ name: String, window: NSWindow? = nil) async {
+            let win = window ?? w
+            win.contentView?.layoutSubtreeIfNeeded(); win.contentView?.displayIfNeeded(); CATransaction.flush()
+            try? await Task.sleep(for: .milliseconds(200))
+            if let cg = CGWindowListCreateImage(.null, .optionIncludingWindow, CGWindowID(win.windowNumber), [.boundsIgnoreFraming, .bestResolution]) {
+                try? NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])?.write(to: dir.appendingPathComponent(name + ".png"))
+            }
+        }
+        w.setContentSize(NSSize(width: 1300, height: 820))
+        s.viewMode = .grid
+        try? await Task.sleep(for: .seconds(1))
+        guard let item = s.items[s.display[0].itemID] else { return check(false, "has photos") }
+        s.select(item.id)
+
+        // 1. K opens the editor in the loupe.
+        _ = s.perform(KeyMap.Match(action: .crop, advance: false))
+        try? await Task.sleep(for: .seconds(1.5))
+        check(s.cropEditing && s.viewMode == .loupe && s.cropDraft == .full, "K opens the crop editor on the photo")
+        let size = ImageDecoder.orientedPixelSize(of: item.files.primary.url) ?? CGSize(width: 3, height: 2)
+        s.cropDraft = CropGeometry.largest(ratio: 4.0 / 5.0, angle: 4, imageSize: size, aspect: "4:5")
+        try? await Task.sleep(for: .milliseconds(600))
+        await snap("crop-editor")
+
+        // 2. Esc discards.
+        s.cancelCrop()
+        check(!s.cropEditing && item.metadata.crop == nil, "cancel leaves the photo uncropped")
+
+        // 3. Commit, persisted to XMP, undo / redo.
+        s.beginCrop()
+        let want = CropGeometry.largest(ratio: 4.0 / 5.0, angle: 0, imageSize: size, aspect: "4:5").normalized
+        s.cropDraft = want
+        s.commitCrop()
+        check(item.metadata.crop == want, "Done applies the crop")
+        try? await Task.sleep(for: .milliseconds(1200))
+        let onDisk = MetadataStore.read(item.files, recover: false).metadata
+        check(onDisk.crop == want, "crop written to the file's XMP (state \(item.writeState), disk \(onDisk.crop?.xmpValue ?? "none"), flag \(onDisk.flag))")
+        try? await Task.sleep(for: .milliseconds(500))
+        await snap("crop-loupe")
+        s.undo()
+        check(item.metadata.crop == nil, "⌘Z removes it")
+        s.redo()
+        check(item.metadata.crop == want, "⇧⌘Z brings it back")
+
+        // 4. Export: Instagram (crop fills 4:5) and X border for two photos.
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("EditTestExports-\(UUID().uuidString.prefix(6))")
+        s.exportTargets = [item.id]
+        s.activeSheet = .export
+        try? await Task.sleep(for: .seconds(1.5))
+        if let sheet = w.attachedSheet { await snap("export-sheet", window: sheet) }
+        s.activeSheet = nil
+        try? await Task.sleep(for: .milliseconds(500))
+        await s.export([item.id], options: .instagram, to: out)
+        let ig = (try? FileManager.default.contentsOfDirectory(at: out, includingPropertiesForKeys: nil)) ?? []
+        func dims(_ u: URL) -> String {
+            guard let src = CGImageSourceCreateWithURL(u as CFURL, nil), let p = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] else { return "?" }
+            return "\(p[kCGImagePropertyPixelWidth] ?? 0)x\(p[kCGImagePropertyPixelHeight] ?? 0)"
+        }
+        check(ig.count == 1 && dims(ig[0]) == "1080x1350" && ig[0].lastPathComponent.hasSuffix("-ig.jpg"), "Instagram export \(ig.map(\.lastPathComponent)) \(ig.map(dims))")
+        let two = Array(s.display.prefix(3).dropFirst().map(\.itemID))
+        await s.export(two, options: .twitter, to: out)
+        let all = ((try? FileManager.default.contentsOfDirectory(at: out, includingPropertiesForKeys: nil)) ?? []).filter { $0.lastPathComponent.contains("-x") }
+        check(all.count == 2, "X export wrote 2 files \(all.map { $0.lastPathComponent + " " + dims($0) })")
+        try? FileManager.default.removeItem(at: out)
+
+        // 5. Reset Crop.
+        s.viewMode = .grid
+        s.select(item.id)
+        s.resetCrop()
+        check(item.metadata.crop == nil, "Reset Crop")
+        try? await Task.sleep(for: .milliseconds(1200))
+        check(MetadataStore.read(item.files, recover: false).metadata.crop == nil, "reset written to the file")
+        Log.session.info("EDITTEST done")
+    }
+
     static func run(_ s: FolderSession) async {
         var failures: [String] = []
         func check(_ ok: Bool, _ what: String) {
@@ -933,9 +1014,9 @@ enum DebugSelfTest {
                     try? rep.representation(using: .png, properties: [:])?.write(to: snapDir.appendingPathComponent("\(mode.rawValue)-\(Int(width)).png"))
                 }
             }
-            w.setContentSize(NSSize(width: 500, height: 400))
-            try? await Task.sleep(for: .milliseconds(300))
-            check(w.contentLayoutRect.width >= 899, "window can't shrink below its minimum (\(Int(w.contentLayoutRect.width))pt)")
+            // The user can't resize below the minimum: the window enforces it (programmatic sizes bypass it).
+            check(w.contentMinSize.width >= 900 && w.contentMinSize.height >= 560,
+                  "window minimum is 900×560 (\(Int(w.contentMinSize.width))×\(Int(w.contentMinSize.height)))")
             s.showInfoPanel = false
             s.showFilterBar = false
             s.viewMode = .grid

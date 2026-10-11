@@ -48,6 +48,15 @@ final class KeyboardController {
             session.showShortcuts = false
             return true
         }
+        // Crop editor: Return applies, Esc cancels; other single keys do nothing (⌘ shortcuts still work).
+        if session.cropEditing && !mods.contains(.command) {
+            switch event.keyCode {
+            case KeyCode.escape: session.cancelCrop()
+            case KeyCode.returnKey, KeyCode.keypadEnter: session.commitCrop()
+            default: break
+            }
+            return true
+        }
         guard let match = KeyMap.match(event) else { return false }
         return session.perform(match)
     }

@@ -51,12 +51,15 @@ public struct PhotoMetadata: Codable, Equatable, Hashable, Sendable {
     public var rating: Int
     public var label: ColorLabel
     public var note: String
+    /// Non-destructive crop / straighten (nil = none).
+    public var crop: CropSpec?
 
-    public init(flag: Flag = .none, rating: Int = 0, label: ColorLabel = .none, note: String = "") {
+    public init(flag: Flag = .none, rating: Int = 0, label: ColorLabel = .none, note: String = "", crop: CropSpec? = nil) {
         self.flag = flag
         self.rating = max(0, min(5, rating))
         self.label = label
         self.note = note
+        self.crop = crop
     }
 
     public static let empty = PhotoMetadata()

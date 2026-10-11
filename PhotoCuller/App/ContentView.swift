@@ -159,6 +159,7 @@ struct SessionView: View {
             case .rename: RenameSheet(session: session)
             case .move: MoveCopySheet(session: session, mode: .move)
             case .copy: MoveCopySheet(session: session, mode: .copy)
+            case .export: ExportSheet(session: session)
             }
         }
         .onChange(of: session.showFilterBar) { if session.showFilterBar { filterFocused = true } }

@@ -2,7 +2,7 @@ import AppKit
 import CullerKit
 
 enum SessionSheet: String, Identifiable {
-    case rename, move, copy
+    case rename, move, copy, export
     var id: String { rawValue }
 }
 
@@ -40,6 +40,8 @@ extension FolderSession {
             goToSharpest()
         case .trash:
             trashSelection()
+        case .crop:
+            beginCrop()
         case .toggleStripShowsAll:
             guard viewMode == .compare else { return false }
             setCompareStripShowsAll(!compare.stripShowsAll)

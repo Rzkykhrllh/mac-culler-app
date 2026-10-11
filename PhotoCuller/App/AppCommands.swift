@@ -136,6 +136,17 @@ struct AppCommands: Commands {
                 .disabled(!canAct)
             Divider()
             Group {
+                Button("Crop / Straighten…") { session?.beginCrop() }
+                    .keyboardShortcut(KeyMap.menuShortcut("edit.crop"))
+                Button("Reset Crop") { session?.resetCrop() }
+                Button("Export…") { session?.beginExport() }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
+                Button("Show Last Export in Finder") { session?.revealLastExports() }
+                    .disabled(session?.lastExports.isEmpty ?? true)
+            }
+            .disabled(!canAct)
+            Divider()
+            Group {
                 Button("Next Photo") { session?.viewMode == .compare ? session?.stepActiveSlot(1) : session?.move(1) }
                     .keyboardShortcut(KeyMap.menuShortcut("nav.next"))
                 Button("Previous Photo") { session?.viewMode == .compare ? session?.stepActiveSlot(-1) : session?.move(-1) }

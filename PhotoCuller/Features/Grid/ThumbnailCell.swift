@@ -549,6 +549,11 @@ final class ThumbnailCellView: NSView, NSDraggingSource, NSViewToolTipOwner {
         if item?.isSharpestInStack == true {
             let sr = pill(symbol: "scope", color: Self.sharpGreen, at: NSPoint(x: x, y: r.minY + pad))
             tips.append((sr, "Sharpest frame of this stack (B jumps here). A hint — you decide."))
+            x = sr.maxX + 3
+        }
+        if let crop = meta.crop, !crop.isIdentity, r.width > 70 {
+            let cr = pill(symbol: "crop", color: .white, at: NSPoint(x: x, y: r.minY + pad))
+            tips.append((cr, "Cropped\(crop.aspect.map { " to " + $0 } ?? "")\(abs(crop.angle) > 0.05 ? String(format: ", straightened %.1f°", crop.angle) : "") — exports use the crop"))
         }
         // Top-right: RAW+JPG pair, or the broken-chain cue of a separated pair; compare slot.
         if let item, item.files.isPair, isPile, !compact, r.width > 90 {

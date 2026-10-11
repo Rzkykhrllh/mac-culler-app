@@ -7,24 +7,26 @@ public struct PartialMetadata: Equatable, Sendable {
     public var rating: Int?
     public var label: ColorLabel?
     public var note: String?
+    public var crop: CropSpec?
 
-    public init(flag: Flag? = nil, rating: Int? = nil, label: ColorLabel? = nil, note: String? = nil) {
+    public init(flag: Flag? = nil, rating: Int? = nil, label: ColorLabel? = nil, note: String? = nil, crop: CropSpec? = nil) {
         self.flag = flag
         self.rating = rating
         self.label = label
         self.note = note
+        self.crop = crop
     }
 
-    public var isEmpty: Bool { flag == nil && rating == nil && label == nil && note == nil }
+    public var isEmpty: Bool { flag == nil && rating == nil && label == nil && note == nil && crop == nil }
 
     /// Field-wise merge: values present in `self` win over `other`.
     public func overlaying(_ other: PartialMetadata) -> PartialMetadata {
         PartialMetadata(flag: flag ?? other.flag, rating: rating ?? other.rating,
-                        label: label ?? other.label, note: note ?? other.note)
+                        label: label ?? other.label, note: note ?? other.note, crop: crop ?? other.crop)
     }
 
     public var resolved: PhotoMetadata {
-        PhotoMetadata(flag: flag ?? .none, rating: rating ?? 0, label: label ?? .none, note: note ?? "")
+        PhotoMetadata(flag: flag ?? .none, rating: rating ?? 0, label: label ?? .none, note: note ?? "", crop: crop)
     }
 }
 
@@ -46,10 +48,12 @@ public enum XMPError: Error, LocalizedError {
     }
 }
 
-/// XMP read / merge / write. Only `xmp:Rating`, `xmp:Label`, `culler:Flag` and `culler:Note` are ever changed;
-/// everything else in the packet is preserved (spec §5.3).
+/// XMP read / merge / write. Only `xmp:Rating`, `xmp:Label`, `culler:Flag`, `culler:Note`, `culler:Crop` and —
+/// for a crop made here — the Camera Raw crop fields (`crs:HasCrop`, `crs:Crop*`, so Lightroom shows the same crop)
+/// are ever changed; everything else in the packet is preserved (spec §5.3).
 public enum XMPCodec {
     static let xmpNS = "http://ns.adobe.com/xap/1.0/"
+    static let crsNS = "http://ns.adobe.com/camera-raw-settings/1.0/"
     static var cullerNS: String { AppConstants.xmpNamespaceURI }
     static var cullerPrefix: String { AppConstants.xmpNamespacePrefix }
 
@@ -72,6 +76,8 @@ public enum XMPCodec {
                 if let v = value, !v.isEmpty { out.flag = Flag(xmpValue: v) }
             case (cullerNS, "Note"):
                 if let v = value, !v.isEmpty { out.note = v }
+            case (cullerNS, "Crop"):
+                if let v = value, !v.isEmpty { out.crop = CropSpec(xmpValue: v) }
             default: break
             }
         }
@@ -92,7 +98,8 @@ public enum XMPCodec {
     // MARK: Merging
 
     /// Returns a mutable copy of `base` with the owned fields set to `m` (clears remove the property).
-    static func merged(_ base: CGImageMetadata?, with m: PhotoMetadata) -> CGMutableImageMetadata {
+    static func merged(_ base: CGImageMetadata?, with m: PhotoMetadata, orientation: Int = 1) -> CGMutableImageMetadata {
+        let hadCrop = base.map(read)?.crop != nil
         let mm = base.flatMap { CGImageMetadataCreateMutableCopy($0) } ?? CGImageMetadataCreateMutable()
         let prefix = ensureNamespace(mm)
         func put(_ path: String, _ value: String?) {
@@ -106,7 +113,32 @@ public enum XMPCodec {
         put("xmp:Label", m.label.xmpValue)
         put("\(prefix):Flag", m.flag.xmpValue)
         put("\(prefix):Note", m.hasNote ? m.note : nil)
+        for (path, value) in cropFields(m.crop, hadCrop: hadCrop, orientation: orientation, prefix: prefix, in: mm) {
+            put(path, value)
+        }
         return mm
+    }
+
+    /// culler:Crop plus the Camera Raw crop for Lightroom. Lightroom's own crop is left alone unless this
+    /// app set one (then clearing ours turns crs:HasCrop off). Straightened crops are not mapped to crs.
+    static func cropFields(_ crop: CropSpec?, hadCrop: Bool, orientation: Int, prefix: String, in mm: CGMutableImageMetadata) -> [(String, String?)] {
+        guard crop != nil || hadCrop else { return [] }
+        var err: Unmanaged<CFError>?
+        CGImageMetadataRegisterNamespaceForPrefix(mm, crsNS as CFString, "crs" as CFString, &err)
+        err?.release()
+        guard let crop, !crop.isIdentity else {
+            return [("\(prefix):Crop", nil), ("crs:HasCrop", "False")]
+        }
+        var out: [(String, String?)] = [("\(prefix):Crop", crop.xmpValue)]
+        if let r = CropGeometry.cameraRawCrop(crop, orientation: orientation) {
+            func f(_ v: Double) -> String { String(format: "%.6f", min(1, max(0, v))) }
+            out += [("crs:HasCrop", "True"), ("crs:CropLeft", f(r.left)), ("crs:CropTop", f(r.top)),
+                    ("crs:CropRight", f(r.right)), ("crs:CropBottom", f(r.bottom)), ("crs:CropAngle", "0"),
+                    ("crs:CropConstrainToWarp", "0")]
+        } else {
+            out.append(("crs:HasCrop", "False"))
+        }
+        return out
     }
 
     /// Registers the culler namespace, reusing a prefix already bound to its URI in the packet.
@@ -124,7 +156,7 @@ public enum XMPCodec {
     }
 
     /// Sidecar content after merging `m` into `existing` (nil = new sidecar).
-    public static func mergedSidecarData(existing: Data?, metadata m: PhotoMetadata, url: URL) throws -> Data {
+    public static func mergedSidecarData(existing: Data?, metadata m: PhotoMetadata, url: URL, orientation: Int = 1) throws -> Data {
         var base: CGImageMetadata?
         if let existing, !existing.isEmpty {
             if let parsed = CGImageMetadataCreateFromXMPData(existing as CFData) {
@@ -134,7 +166,7 @@ public enum XMPCodec {
                 throw XMPError.invalidSidecar(url)
             }
         }
-        let mm = merged(base, with: m)
+        let mm = merged(base, with: m, orientation: orientation)
         let hasTags = ((CGImageMetadataCopyTags(mm) as? [CGImageMetadataTag]) ?? []).isEmpty == false
         guard hasTags else { return emptyPacket }
         guard let data = CGImageMetadataCreateXMPData(mm, nil) as Data? else { throw XMPError.serializationFailed }
@@ -175,9 +207,10 @@ public enum XMPCodec {
     // MARK: Writing
 
     /// Merges `m` into the sidecar at `url` (created when missing). Atomic.
-    public static func writeSidecar(_ m: PhotoMetadata, to url: URL, beforeReplace: AtomicFile.BeforeReplaceHook? = nil) throws {
+    public static func writeSidecar(_ m: PhotoMetadata, to url: URL, orientation: Int = 1,
+                                    beforeReplace: AtomicFile.BeforeReplaceHook? = nil) throws {
         let existing = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
-        let data = try mergedSidecarData(existing: existing, metadata: m, url: url)
+        let data = try mergedSidecarData(existing: existing, metadata: m, url: url, orientation: orientation)
         try AtomicFile.write(data, to: url, beforeReplace: beforeReplace)
     }
 
@@ -201,6 +234,13 @@ public enum XMPCodec {
         put("xmp:Label", m.label.xmpValue, current.label?.xmpValue)
         put("\(prefix):Flag", m.flag.xmpValue, current.flag?.xmpValue)
         put("\(prefix):Note", m.hasNote ? m.note : nil, current.note)
+        if m.crop != current.crop {
+            let orientation = (CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any])?[kCGImagePropertyOrientation] as? Int ?? 1
+            for (path, value) in cropFields(m.crop, hadCrop: current.crop != nil, orientation: orientation, prefix: prefix, in: patch) {
+                CGImageMetadataSetValueWithPath(patch, nil, path as CFString, (value ?? "") as CFString)
+                changed = true
+            }
+        }
         guard changed else { return }
 
         try AtomicFile.replace(url, beforeReplace: beforeReplace) { tmp in
