@@ -52,7 +52,7 @@ struct ShortcutSheet: View {
         ("Focus", "scope", [(KeyMap.label("focus.peaking"), "Focus peaking"), (KeyMap.label("focus.clipping"), "Clipping"), (KeyMap.label("focus.subject"), "Zoom to eyes / face / animal"), (KeyMap.label("focus.sharpest"), "Sharpest in stack")]),
         ("Stacks & compare", "square.stack", [(KeyMap.label("stack.toggle"), "Expand / collapse"), ("⇧S / ⌥S", "Stacks on/off · Bursts ↔ Similar"), ("⌥[ / ⌥]", "Similarity stricter · looser"),
                                               ("Tab", "Next compare slot"), ("⌥Z / ⌥P", "Sync zoom · Pin best"), ("⌥2 – ⌥4", "Number of slots")]),
-        ("Files & tabs", "folder", [("F2", "Rename"), ("⇧⌘M / ⇧⌘C", "Move · Copy"), (KeyMap.label("file.trash") + " / ⇧⌘⌫", "Trash photo · all rejects"), ("⌃⌘L / ⌃⇧⌘L", "To Lightroom · all picks"), ("⌘Z / ⇧⌘Z", "Undo · Redo"), ("⌘T / ⌘W", "New · Close tab"),
+        ("Files & tabs", "folder", [("F2", "Rename"), ("⇧⌘M / ⇧⌘C", "Move · Copy"), (KeyMap.label("file.trash") + " / ⇧⌘⌫", "Trash photo · all rejects"), ("⌃⌘L / ⌃⇧⌘L", "To Lightroom · all picks"), (KeyMap.label("edit.crop") + " / ⇧⌘E", "Crop · Export"), ("⌘Z / ⇧⌘Z", "Undo · Redo"), ("⌘T / ⌘W", "New · Close tab"),
                                     ("⌘1 – 9", "Go to tab"), ("⌘↑ / ⌥⌘↓", "Enclosing · Next folder")]),
     ]
     }

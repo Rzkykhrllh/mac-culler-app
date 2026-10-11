@@ -12,6 +12,9 @@ struct LoupeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if session.cropEditing {
+                CropEditorView(session: session, image: loader.image, pixelSize: loader.pixelSize)
+            } else {
             ZStack {
                 ZoomableImage(image: loader.image, pixelSize: loader.pixelSize, contentID: loader.itemID,
                               isFullResolution: loader.isFullResolution, slot: 0, hub: session.viewports,
@@ -20,6 +23,21 @@ struct LoupeView: View {
                               onDropItem: { session.select($0) },
                               peaking: loader.peaking, clipping: loader.clipping)
                 ImageStateOverlay(loader: loader)
+                if let crop = session.currentItem?.metadata.crop, !crop.isIdentity, session.viewports.zoomPercent == nil {
+                    CropPreviewOverlay(crop: crop, pixelSize: loader.pixelSize)
+                    VStack {
+                        HStack {
+                            Label("Cropped\(crop.aspect.map { " " + $0 } ?? "") · \(KeyMap.label("edit.crop")) to edit", systemImage: "crop")
+                                .font(.caption.weight(.medium))
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .glassCapsule()
+                            Spacer()
+                        }
+                        Spacer()
+                    }
+                    .padding(10)
+                    .allowsHitTesting(false)
+                }
                 VStack {
                     HStack { Spacer(); FitButton(hub: session.viewports) }
                     Spacer()
@@ -39,6 +57,7 @@ struct LoupeView: View {
                         .padding(10)
                     }
                 }
+            }
             }
             if session.showFilmstrip {
                 FilmstripView(session: session, entries: session.display, revision: session.displayRevision,
@@ -64,7 +83,12 @@ struct LoupeView: View {
         }
         .onChange(of: session.showPeaking) { loader.setOverlays(peaking: session.showPeaking, clipping: session.showClipping) }
         .onChange(of: session.showClipping) { loader.setOverlays(peaking: session.showPeaking, clipping: session.showClipping) }
-        .onChange(of: session.currentID) { show() }
+        .onChange(of: session.currentID) {
+            show()
+            // Another photo (filmstrip click, arrows): the crop being edited belonged to the previous one.
+            if session.cropEditing, session.currentID != session.cropItemID { session.cancelCrop() }
+        }
+        .onDisappear { if session.cropEditing { session.cancelCrop() } }
         .onChange(of: session.currentItem?.files) { show() }
         .onChange(of: session.imageRevision) { loader.reload(session.currentItem); prefetch() }
     }

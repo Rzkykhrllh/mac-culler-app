@@ -97,6 +97,19 @@ enum PhotoContextMenu {
         menu.addItem(check(ActionMenuItem("Focus Peaking", shortcut: "focus.peaking") { s.showPeaking.toggle() }, s.showPeaking))
         menu.addItem(check(ActionMenuItem("Clipping", shortcut: "focus.clipping") { s.showClipping.toggle() }, s.showClipping))
 
+        // Edit / export.
+        menu.addItem(.separator())
+        menu.addItem(ActionMenuItem("Crop / Straighten…", shortcut: "edit.crop") {
+            if let first = targets.first { s.select(first.id) }
+            s.beginCrop()
+        })
+        if targets.contains(where: { $0.metadata.crop != nil }) {
+            menu.addItem(ActionMenuItem("Reset Crop") { s.resetCrop() })
+        }
+        menu.addItem(ActionMenuItem(targets.count > 1 ? "Export \(targets.count) Photos…" : "Export…", key: "e", modifiers: [.command, .shift]) {
+            s.beginExport()
+        })
+
         // Hand-off: Lightroom import right here, any other editor under Open With.
         menu.addItem(.separator())
         if let lr = ExternalApps.lightroom {

@@ -25,6 +25,7 @@ enum KeyAction: Equatable {
     case zoomToSubject
     case sharpest
     case trash
+    case crop
 }
 
 struct KeyBinding {
@@ -109,6 +110,7 @@ enum KeyMap {
             .init(id: "compare.syncZoom", key: .character("z"), option: true, action: .toggleSyncZoom, title: "Compare: sync zoom & pan", group: stack),
             .init(id: "compare.pinBest", key: .character("p"), option: true, action: .togglePinBest, title: "Compare: pin current best", group: stack),
             .init(id: "compare.stripAll", key: .character("a"), option: true, action: .toggleStripShowsAll, title: "Compare: filmstrip shows all / candidates", group: stack),
+            .init(id: "edit.crop", key: .character("k"), action: .crop, title: "Crop / straighten (loupe)", group: file),
             .init(id: "file.rename", key: .code(KeyCode.f2), action: .rename, title: "Rename…", group: file),
             .init(id: "file.trash", key: .code(KeyCode.delete), action: .trash, title: "Move to Trash (undo with ⌘Z)", group: file),
             .init(id: "file.trashForward", key: .code(KeyCode.forwardDelete), action: .trash, title: "Move to Trash (⌦)", group: file),

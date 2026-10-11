@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 
 /// Item-level metadata persistence: decides where each file's XMP lives, keeps RAW sidecar and JPEG embedded XMP
 /// in sync, maintains the xattr backup and (optionally) Finder color tags.
@@ -73,7 +74,9 @@ public enum MetadataStore {
         var updated = item
         if item.needsSidecar {
             let url = item.sidecarWriteURL
-            try XMPCodec.writeSidecar(m, to: url, beforeReplace: options.beforeReplace)
+            // The sidecar describes the RAW: its Camera Raw crop is in the RAW's stored orientation.
+            let orientation = m.crop == nil ? 1 : (item.raw ?? item.primary).map { Self.orientation(of: $0.url) } ?? 1
+            try XMPCodec.writeSidecar(m, to: url, orientation: orientation, beforeReplace: options.beforeReplace)
             updated.sidecarURL = url
         }
         for f in item.files where f.kind.metadataStorage == .embedded {
@@ -85,6 +88,12 @@ public enum MetadataStore {
         }
         updated.files = item.files.map { FileRef.load($0.url) ?? $0 }
         return updated
+    }
+
+    static func orientation(of url: URL) -> Int {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] else { return 1 }
+        return (props[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
     }
 
     public static func writeBackup(_ m: PhotoMetadata, to item: ItemFiles) {
