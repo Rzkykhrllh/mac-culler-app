@@ -48,6 +48,11 @@ final class KeyboardController {
             session.showShortcuts = false
             return true
         }
+        // ⌃C: the same as ⌘C (copy the photos as files), for those used to it from other systems.
+        if mods == [.control], event.charactersIgnoringModifiers?.lowercased() == "c", !session.cropEditing {
+            session.copyToPasteboard()
+            return true
+        }
         // Crop editor: Return applies, Esc cancels; other single keys do nothing (⌘ shortcuts still work).
         if session.cropEditing && !mods.contains(.command) {
             switch event.keyCode {

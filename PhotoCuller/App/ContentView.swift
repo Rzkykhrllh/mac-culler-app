@@ -189,6 +189,12 @@ struct SessionToolbar: ToolbarContent {
         }
         ViewModeToolbarItem(session: session)
         ToolbarItemGroup(placement: .primaryAction) {
+            let shareItems = session.shareURLs(session.markTargets)
+            ShareLink(items: shareItems) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            .disabled(shareItems.isEmpty)
+            .help("Share the selected photos — AirDrop, Messages, Mail… (the JPEG of a RAW+JPG pair)")
             if session.writeFailures > 0 {
                 Button { session.retryFailedWrites() } label: {
                     Label("\(session.writeFailures) not saved", systemImage: "exclamationmark.triangle.fill")
