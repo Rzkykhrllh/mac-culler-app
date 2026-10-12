@@ -84,6 +84,23 @@ extension FolderSession {
         }
     }
 
+    /// What Share sends: the JPEG of a RAW+JPG pair (what a chat or mail expects), otherwise the file itself.
+    func shareURLs(_ targets: [PhotoItem]) -> [URL] {
+        targets.map { $0.files.files.first { $0.kind.isRaster }?.url ?? $0.files.primary.url }
+    }
+
+    /// ⌘C (also ⌃C), like Finder: the photos' files on the clipboard, to paste into Finder, Messages, Mail…
+    /// Both files of a RAW+JPG pair go (the .xmp stays; Copy… ⇧⌘C copies with sidecars into a folder).
+    func copyToPasteboard(_ pb: NSPasteboard = .general) {
+        let targets = markTargets
+        let urls = targets.flatMap { $0.files.files.map(\.url) }
+        guard !urls.isEmpty else { return }
+        pb.clearContents()
+        pb.writeObjects(urls as [NSURL])
+        let n = targets.count
+        showToast("Copied \(n) photo\(n == 1 ? "" : "s") · paste with ⌘V in Finder or any app")
+    }
+
     func importToLightroom(_ targets: [PhotoItem]) {
         guard let lr = ExternalApps.lightroom else { return showToast("Lightroom isn’t installed") }
         guard !targets.isEmpty else { return showToast("No photos to send") }

@@ -118,6 +118,10 @@ enum PhotoContextMenu {
             item.image = ExternalApps.icon(lr.url)
             menu.addItem(item)
         }
+        let share = NSSharingServicePicker(items: s.shareURLs(targets) as [NSURL]).standardShareMenuItem
+        share.title = targets.count > 1 ? "Share \(targets.count) Photos" : "Share"
+        menu.addItem(share)
+        menu.addItem(ActionMenuItem("Copy", key: "c", modifiers: [.command]) { s.copyToPasteboard() })
         let openWith = NSMenu()
         for app in ExternalApps.editors(for: targets[0].files.primary.url) {
             let item = ActionMenuItem(ExternalApps.name(of: app)) { s.open(targets, in: app) }

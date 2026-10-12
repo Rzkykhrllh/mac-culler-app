@@ -89,7 +89,15 @@ struct AppCommands: Commands {
         // Standard text editing still works in text fields; outside them ⌘A selects all photos.
         CommandGroup(replacing: .pasteboard) {
             Button("Cut") { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }.keyboardShortcut("x")
-            Button("Copy") { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }.keyboardShortcut("c")
+            Button("Copy") {
+                // Text field: copy text. Otherwise copy the selected photos as files, like Finder.
+                if KeyboardController.isEditingText || session == nil {
+                    NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil)
+                } else {
+                    session?.copyToPasteboard()
+                }
+            }
+            .keyboardShortcut("c")
             Button("Paste") { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }.keyboardShortcut("v")
             Button("Select All") {
                 if KeyboardController.isEditingText || session == nil {

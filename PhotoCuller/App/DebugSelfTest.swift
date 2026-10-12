@@ -668,6 +668,18 @@ enum DebugSelfTest {
             let openWith = menu.items.first { $0.title == "Open With" }?.submenu?.items.map(\.title) ?? []
             Log.session.info("MODETEST menu: \(titles, privacy: .public); Open With: \(openWith, privacy: .public)")
         }
+        // ⌘C copies the photos' files (to a private pasteboard here, not the user's clipboard); Share is in the menu.
+        s.viewMode = .grid
+        let two = s.display.prefix(2).map(\.itemID)
+        s.selection = Set(two); s.currentID = two[0]
+        let pb = NSPasteboard(name: NSPasteboard.Name("PhotoCuller.copytest"))
+        s.copyToPasteboard(pb)
+        let pasted = (pb.readObjects(forClasses: [NSURL.self]) as? [URL]) ?? []
+        let want = two.compactMap { s.items[$0] }.flatMap { $0.files.files.map(\.url) }
+        check(Set(pasted) == Set(want), "⌘C puts \(pasted.count) files on the pasteboard (\(want.count) expected)")
+        pb.releaseGlobally()
+        let shareTitle = PhotoContextMenu.make(s)?.items.first { $0.title.hasPrefix("Share") }
+        check(shareTitle?.title == "Share 2 Photos", "context menu Share (\(shareTitle?.title ?? "missing"))")
         Log.session.info("MODETEST lightroom: \(ExternalApps.lightroom?.name ?? "none", privacy: .public), picks \(s.picks.count)")
         Log.session.info("MODETEST done")
     }
