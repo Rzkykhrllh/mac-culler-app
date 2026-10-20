@@ -74,6 +74,12 @@ struct PhotoCullerApp: App {
                                 await DebugSelfTest.runTrash(app.session!)
                             }
                         }
+                        if args.contains("-demo") {
+                            Task {
+                                while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }
+                                await DebugDemo.run(app.session!)
+                            }
+                        }
                         if args.contains("-selfTest") {
                             Task {
                                 while app.session == nil { try? await Task.sleep(for: .milliseconds(100)) }

@@ -56,6 +56,7 @@
 		D144E9E3EDB574170E2D1C38 /* FolderSession+FileOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBAA8A1557C25BAF3B4DBA98 /* FolderSession+FileOps.swift */; };
 		D1BB3CC6A0C630FBC92A02B2 /* CompareState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4760F214B3B8361F3ABAA442 /* CompareState.swift */; };
 		D803B59D87757F618F150671 /* GettingStartedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168F784BD120D1917C8FD989 /* GettingStartedView.swift */; };
+		D9B9A4332505FE7AECA7CBEE /* DebugDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F3909D5CDD7EE6DDF4CB7A9 /* DebugDemo.swift */; };
 		E5EDC79164937A5B1C358D91 /* FolderSession+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018269D118B1526584D70F5F /* FolderSession+Display.swift */; };
 		EC44B88320A095E067DC88AD /* ExportSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 983E981F911AA4B4AB9DAC78 /* ExportSheet.swift */; };
 		ED4E930F0884C599D471CCE8 /* FolderSession+External.swift in Sources */ = {isa = PBXBuildFile; fileRef = E214DD1F3B3C4E7973CD068E /* FolderSession+External.swift */; };
@@ -76,6 +77,7 @@
 		16F4B962DD29424732F7518B /* ShortcutStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutStore.swift; sourceTree = "<group>"; };
 		196B6BD3CF18509ACAB3B9CA /* PhotoContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoContextMenu.swift; sourceTree = "<group>"; };
 		1B79B5EEAEAEAE9D64A3DC66 /* PhotoItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoItem.swift; sourceTree = "<group>"; };
+		1F3909D5CDD7EE6DDF4CB7A9 /* DebugDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugDemo.swift; sourceTree = "<group>"; };
 		23CA5DD502EB16F90CE77A50 /* PhotoCullerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCullerApp.swift; sourceTree = "<group>"; };
 		25A5814B7A29BA42B52790D0 /* Pickture.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Pickture.entitlements; sourceTree = "<group>"; };
 		2CD623A99F074169852E3681 /* AccessGrants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessGrants.swift; sourceTree = "<group>"; };
@@ -286,6 +288,7 @@
 				70AFDD45A421C9D74FE4C8DC /* AppCommands.swift */,
 				BF01ACF26E039E41C297FD88 /* AppModel.swift */,
 				48E99621A4F9FAD522B0F96A /* ContentView.swift */,
+				1F3909D5CDD7EE6DDF4CB7A9 /* DebugDemo.swift */,
 				CB4D06437B61442A3AB1E872 /* DebugSelfTest.swift */,
 				6941D51A92896BE51198C1C6 /* HangWatch.swift */,
 				B0C8B1C687BD042A7B9AB248 /* KeyboardController.swift */,
@@ -458,6 +461,7 @@
 				42F493F12B70CB581D6A10D2 /* CompareView.swift in Sources */,
 				10011C85EDFC3C4E11B6D18B /* ContentView.swift in Sources */,
 				3972051C1066E710A10952DB /* CropEditorView.swift in Sources */,
+				D9B9A4332505FE7AECA7CBEE /* DebugDemo.swift in Sources */,
 				1509190391EBA9A04DCF2F07 /* DebugSelfTest.swift in Sources */,
 				EC44B88320A095E067DC88AD /* ExportSheet.swift in Sources */,
 				A233FF43951B52204796578B /* FilterBar.swift in Sources */,

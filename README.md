@@ -5,6 +5,13 @@
 <p align="center"><b>Pick the keepers from every shoot — fast, right from the keyboard.</b><br>
 A native macOS photo culling app for RAW + JPEG shooters.</p>
 
+<p align="center">
+  <a href="https://github.com/Rzkykhrllh/pickture/releases/latest"><b>⬇︎ Download for macOS</b></a> ·
+  <a href="https://github.com/Rzkykhrllh/pickture/releases/download/v0.1.1/pickture-demo.mp4"><b>▶︎ Watch the 1-minute demo</b></a>
+</p>
+
+<p align="center"><a href="https://github.com/Rzkykhrllh/pickture/releases/download/v0.1.1/pickture-demo.mp4"><img src="docs/screenshots/demo-poster.jpg" width="900" alt="Pickture demo video: culling a RAW + JPEG shoot from the keyboard"></a></p>
+
 ---
 
 Pickture is for the step between the memory card and your editor: go through a shoot, keep the best frames,
@@ -19,6 +26,8 @@ it works directly on your folders and never changes your pixels.
 - Select a block (⇧ + arrows or ⇧-click, in the grid and the loupe's filmstrip) and mark it in one go.
 - Filters (flag, rating, label, file type, camera, lens, ISO, aperture, date…) and sorting.
 
+<p align="center"><img src="docs/screenshots/grid.jpg" width="900" alt="Grid: RAW + JPEG pairs shown as one photo, with picks, rejects, stars and labels"></p>
+
 **RAW + JPEG, done right**
 - Show a RAW and its JPEG as one photo (marks go to both), separately, or only one kind.
 - *True RAW* rendering from the sensor data, or the camera's own preview (film simulations and all).
@@ -27,9 +36,27 @@ it works directly on your folders and never changes your pixels.
 - Bursts and *similar* photos stack together automatically (on-device Vision; a strict ↔ loose slider).
 - Focus peaking, highlight / shadow clipping, zoom straight to the eyes, face or animal, and a hint for the sharpest frame of a stack.
 
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/compare.jpg" alt="Compare two frames of a stack side by side"><br><sub><b>Compare</b> — two to four frames side by side, zoom and pan in sync</sub></td>
+    <td width="50%"><img src="docs/screenshots/focus-peaking.jpg" alt="100% zoom with focus peaking"><br><sub><b>Focus peaking</b> at 100% — see what is actually sharp</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/stacks.jpg" alt="An expanded stack of similar photos"><br><sub><b>Stacks</b> — bursts and similar shots grouped, S to expand</sub></td>
+    <td width="50%"><img src="docs/screenshots/loupe.jpg" alt="Loupe view with filmstrip and EXIF"><br><sub><b>Loupe</b> — one photo, filmstrip and shooting info</sub></td>
+  </tr>
+</table>
+
 **Crop & export**
 - Non-destructive crop and straighten with ratios (4:5, 1:1, 9:16, 16:9, custom…).
 - Export many photos at once: white border (% of the photo), or a fixed-ratio canvas such as 4:5, any color, sized for posting (e.g. 1080 px wide), GPS removed. Save your own export presets.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/crop.jpg" alt="Crop editor set to 4:5"><br><sub><b>Crop</b> — 4:5 for a post, saved to XMP so Lightroom shows it too</sub></td>
+    <td width="50%"><img src="docs/screenshots/export.jpg" alt="Export sheet with a white border"><br><sub><b>Export</b> — white border or a fixed-ratio canvas, for many photos at once</sub></td>
+  </tr>
+</table>
 
 **Hand off**
 - Import into Lightroom with one shortcut, *Open With* any photo app, Share (AirDrop, Messages, Mail…), ⌘C to paste files anywhere.
@@ -182,6 +209,9 @@ build/DD/Build/Products/Debug/Pickture.app/Contents/MacOS/Pickture \
   -openFolder ~/Library/Containers/com.byairu.photoculler/Data/Documents/TestShoot -selfTest
 log stream --predicate 'subsystem == "com.byairu.photoculler"' --level info
 ```
+
+`-demo` runs a scripted tour (on a *copy* of a shoot: it writes marks and a crop) and saves the README screenshots
+and `pickture-demo.mp4` to `Documents/Demo` in the container, then quits.
 
 Other flags: `-uiSnapshots`, `-scrollTest`, `-modeTest`, `-editTest`, `-shortcutTest`, `-trashTest`, `-hangWatch`, `-subfolders`.
 Use folders inside the app container: `Data/Pictures` etc. there are symlinks to your real folders.

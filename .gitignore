@@ -10,3 +10,6 @@ Pickture.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
 dist/
 build.noindex/
 build
+
+# Full-size demo output (screenshots are committed compressed in docs/screenshots)
+docs/demo/
