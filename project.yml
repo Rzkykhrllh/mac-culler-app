@@ -1,4 +1,4 @@
-name: PhotoCuller
+name: Pickture
 options:
   bundleIdPrefix: com.byairu
   deploymentTarget:
@@ -13,11 +13,11 @@ settings:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
 targets:
-  PhotoCuller:
+  Pickture:
     type: application
     platform: macOS
     sources:
-      - path: PhotoCuller
+      - path: Pickture
     dependencies:
       - package: CullerKit
     configFiles:
@@ -26,15 +26,14 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Pickture
-        PRODUCT_MODULE_NAME: PhotoCuller
         PRODUCT_BUNDLE_IDENTIFIER: com.byairu.photoculler
-        MARKETING_VERSION: "0.1.0"
+        MARKETING_VERSION: "0.1.1"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: PhotoCuller
+        INFOPLIST_KEY_CFBundleDisplayName: Pickture
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
-        CODE_SIGN_ENTITLEMENTS: PhotoCuller/Resources/PhotoCuller.entitlements
+        CODE_SIGN_ENTITLEMENTS: Pickture/Resources/Pickture.entitlements
         ENABLE_APP_SANDBOX: YES
         ENABLE_USER_SELECTED_FILES: readwrite
         ENABLE_HARDENED_RUNTIME: YES
@@ -48,10 +47,10 @@ targets:
         Release:
           ONLY_ACTIVE_ARCH: NO
 schemes:
-  PhotoCuller:
+  Pickture:
     build:
       targets:
-        PhotoCuller: all
+        Pickture: all
     run:
       config: Debug
     test:

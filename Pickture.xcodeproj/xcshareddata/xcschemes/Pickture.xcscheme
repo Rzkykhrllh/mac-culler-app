@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "8242A71209B0573840789F55"
-               BuildableName = "PhotoCuller.app"
-               BlueprintName = "PhotoCuller"
-               ReferencedContainer = "container:PhotoCuller.xcodeproj">
+               BlueprintIdentifier = "4D0474F242A006518F9DD0A6"
+               BuildableName = "Pickture.app"
+               BlueprintName = "Pickture"
+               ReferencedContainer = "container:Pickture.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -32,10 +32,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "8242A71209B0573840789F55"
-            BuildableName = "PhotoCuller.app"
-            BlueprintName = "PhotoCuller"
-            ReferencedContainer = "container:PhotoCuller.xcodeproj">
+            BlueprintIdentifier = "4D0474F242A006518F9DD0A6"
+            BuildableName = "Pickture.app"
+            BlueprintName = "Pickture"
+            ReferencedContainer = "container:Pickture.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -68,10 +68,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "8242A71209B0573840789F55"
-            BuildableName = "PhotoCuller.app"
-            BlueprintName = "PhotoCuller"
-            ReferencedContainer = "container:PhotoCuller.xcodeproj">
+            BlueprintIdentifier = "4D0474F242A006518F9DD0A6"
+            BuildableName = "Pickture.app"
+            BlueprintName = "Pickture"
+            ReferencedContainer = "container:Pickture.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -87,10 +87,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "8242A71209B0573840789F55"
-            BuildableName = "PhotoCuller.app"
-            BlueprintName = "PhotoCuller"
-            ReferencedContainer = "container:PhotoCuller.xcodeproj">
+            BlueprintIdentifier = "4D0474F242A006518F9DD0A6"
+            BuildableName = "Pickture.app"
+            BlueprintName = "Pickture"
+            ReferencedContainer = "container:Pickture.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

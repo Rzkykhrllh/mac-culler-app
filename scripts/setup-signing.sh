@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Writes Config/Signing.local.xcconfig so PhotoCuller is signed with your (free) Apple Development certificate.
+# Writes Config/Signing.local.xcconfig so Pickture is signed with your (free) Apple Development certificate.
 # A stable signing identity keeps folder permissions and the app's data across rebuilds.
 set -e
 cd "$(dirname "$0")/.."

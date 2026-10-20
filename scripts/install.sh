@@ -12,7 +12,7 @@ DEST=/Applications/Pickture.app
 echo "▸ Generating project"
 xcodegen generate --quiet
 echo "▸ Building Release (build $BUILD)…"
-if ! xcodebuild -project PhotoCuller.xcodeproj -scheme PhotoCuller -configuration Release \
+if ! xcodebuild -project Pickture.xcodeproj -scheme Pickture -configuration Release \
         -derivedDataPath "$DD" CURRENT_PROJECT_VERSION="$BUILD" build > "$DD.log" 2>&1; then
     grep -E "error:" "$DD.log" | sort -u | head -20
     echo "✗ Build failed — full log: $DD.log"

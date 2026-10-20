@@ -47,7 +47,7 @@ it works directly on your folders and never changes your pixels.
 
 ## Install
 
-1. Download the latest **Pickture-x.y.z.dmg** from [Releases](https://github.com/Rzkykhrllh/mac-culler-app/releases).
+1. Download the latest **Pickture-x.y.z.dmg** from [Releases](https://github.com/Rzkykhrllh/pickture/releases).
 2. Open it and drag **Pickture** to **Applications**.
 3. The app is not notarized yet, so the first launch needs one extra step: right-click Pickture ▸ **Open** ▸ **Open**
    (or System Settings ▸ Privacy & Security ▸ **Open Anyway**).
@@ -79,9 +79,9 @@ Single-key shortcuts can be changed in Settings ▸ Shortcuts.
 ## Building from source
 
 ```bash
-brew install xcodegen          # project.yml → PhotoCuller.xcodeproj
+brew install xcodegen          # project.yml → Pickture.xcodeproj
 xcodegen generate
-open PhotoCuller.xcodeproj     # ⌘R to run, ⌘U to test
+open Pickture.xcodeproj        # ⌘R to run, ⌘U to test
 ```
 
 Command line:
@@ -91,8 +91,6 @@ scripts/install.sh             # Release build → /Applications/Pickture.app
 scripts/make-dmg.sh            # → dist/Pickture-<version>-<build>.dmg
 cd Packages/CullerKit && swift test
 ```
-
-The Xcode project and scheme are still called `PhotoCuller` (the original working name); the product is Pickture.
 
 ### Stable signing (so permissions survive rebuilds)
 
@@ -110,7 +108,7 @@ For Mac App Store / Developer ID distribution use the same file with the matchin
 ## Project layout
 
 ```
-PhotoCuller/                 App target
+Pickture/                    App target
   App/                       entry point, menus, keyboard routing
   Model/                     FolderSession (items, stacks, display, marking, undo, file ops, crop, export)
   Features/                  Grid, Loupe, Compare, Edit (crop, export), Filter, Info, Sidebar, Settings…
