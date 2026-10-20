@@ -100,7 +100,9 @@ struct ExportSheet: View {
                     let parts = v.split(separator: ":").compactMap { Double($0) }
                     if parts.count == 2 { o.frame = .canvas(width: parts[0], height: parts[1], marginPercent: m) }
                 })) {
-                    ForEach(Self.ratios, id: \.self) { Text($0).tag($0) }
+                    ForEach(Self.ratios, id: \.self) { r in
+                        Text(Self.ratioHints[r].map { "\(r)  ·  \($0)" } ?? r).tag(r)
+                    }
                     Divider()
                     Text("Custom…").tag("custom")
                 }
@@ -144,7 +146,7 @@ struct ExportSheet: View {
                 Text("Long edge 4096").tag("4096")
                 Text("Long edge 2048").tag("2048")
                 Text("Long edge 1080").tag("1080")
-                Text("Width 1080").tag("w1080")
+                Text("Width 1080  ·  Instagram").tag("w1080")
             }
             LabeledContent("Quality") {
                 HStack {
@@ -217,6 +219,11 @@ struct ExportSheet: View {
     }
 
     static let ratios = ["4:5", "1:1", "5:4", "2:3", "3:2", "9:16", "16:9"]
+    /// Familiar names, as hints only.
+    static let ratioHints: [String: String] = [
+        "4:5": "Instagram post", "1:1": "Square", "5:4": "Landscape post", "2:3": "Portrait",
+        "3:2": "Classic photo", "9:16": "Story · Reels · TikTok", "16:9": "YouTube · widescreen",
+    ]
 
     private func fmt(_ v: Double) -> String { v == v.rounded() ? String(Int(v)) : String(format: "%.2g", v) }
 

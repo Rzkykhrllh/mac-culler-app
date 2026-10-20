@@ -181,7 +181,7 @@ struct CropEditorView: View {
 
     private var aspectBar: some View {
         ChoiceBar(options: CropGeometry.presets.map { p in
-            .init(value: p.id, title: p.title, help: p.id == "4:5" ? "4:5 — Instagram portrait post" : p.id == "9:16" ? "9:16 — story / reel" : "Crop to \(p.title)")
+            .init(value: p.id, title: p.title, help: ExportSheet.ratioHints[p.id].map { "\(p.title) — \($0)" } ?? "Crop to \(p.title)")
         }, selection: aspectBinding)
     }
 
