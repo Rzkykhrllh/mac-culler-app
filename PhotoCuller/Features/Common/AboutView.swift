@@ -51,11 +51,6 @@ struct AboutView: View {
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.05)))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.white.opacity(0.08)))
 
-            VStack(spacing: 2) {
-                Text("Built with Swift, SwiftUI, ImageIO, Core Image and Vision.")
-                Text("Uses GRDB.swift (MIT License) by Gwendal Roué.")
-            }
-            .font(.caption2).foregroundStyle(.tertiary)
             Text("© 2026 Rizky Khairullah").font(.caption2).foregroundStyle(.tertiary)
         }
         .padding(28)
