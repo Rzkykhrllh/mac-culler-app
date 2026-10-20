@@ -78,12 +78,15 @@ final class ThemeStore {
     var backdrop: BackdropStyle { didSet { save() } }
     /// Soft accent-colored light in the corners of the window.
     var glow: Bool { didSet { save() } }
+    /// Dock / app switcher icon while the app runs (the installed icon is the dark one).
+    var lightAppIcon: Bool { didSet { save(); applyAppIcon() } }
 
     private init() {
         let d = UserDefaults.standard
         accent = d.string(forKey: Self.accentKey).flatMap(AccentPalette.init) ?? .amber
         backdrop = d.string(forKey: Self.backdropKey).flatMap(BackdropStyle.init) ?? .graphite
         glow = d.object(forKey: Self.glowKey) as? Bool ?? true
+        lightAppIcon = d.bool(forKey: "theme.lightAppIcon")
     }
 
     private func save() {
@@ -91,9 +94,15 @@ final class ThemeStore {
         d.set(accent.rawValue, forKey: Self.accentKey)
         d.set(backdrop.rawValue, forKey: Self.backdropKey)
         d.set(glow, forKey: Self.glowKey)
+        d.set(lightAppIcon, forKey: "theme.lightAppIcon")
     }
 
     func reset() { accent = .amber; backdrop = .graphite; glow = true }
+
+    /// nil restores the bundle's (dark) icon.
+    func applyAppIcon() {
+        NSApp.applicationIconImage = lightAppIcon ? NSImage(named: "AppIconLight") : nil
+    }
 }
 
 extension Notification.Name {

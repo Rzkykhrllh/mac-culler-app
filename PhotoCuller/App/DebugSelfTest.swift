@@ -947,7 +947,8 @@ enum DebugSelfTest {
         let pairs = s.items.values.filter { $0.files.primary.kind.isRaw }.count
         check(both == combined + pairs && jpeg == combined && raw == pairs, "file modes: one=\(combined) separate=\(both) jpeg=\(jpeg) raw=\(raw)")
         s.setFileView(start); try? await Task.sleep(for: .milliseconds(800)); await waitRegroup()
-        check(s.matchingCount == (start == .combined ? combined : both), "back to \(start.rawValue)")
+        let expected: Int = switch start { case .combined: combined; case .both: both; case .jpegOnly: jpeg; case .rawOnly: raw }
+        check(s.matchingCount == expected, "back to \(start.rawValue) (\(s.matchingCount) of \(expected))")
 
         // Sidebar tree.
         let sidebar = s.app.sidebar

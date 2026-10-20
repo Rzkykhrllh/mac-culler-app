@@ -112,6 +112,15 @@ struct AppearanceSettings: View {
                 Text(theme.backdrop.subtitle).font(.caption).foregroundStyle(.secondary)
                 Toggle("Soft glow in the window corners", isOn: $theme.glow)
             }
+            Section("App icon") {
+                Picker("Icon", selection: $theme.lightAppIcon) {
+                    Text("Dark").tag(false)
+                    Text("Light").tag(true)
+                }
+                .pickerStyle(.segmented)
+                Text("Shown in the Dock and app switcher while \(AppConstants.appName) runs. Finder and Launchpad keep the dark icon.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section {
                 HStack {
                     Text("The interface stays dark on purpose: a bright surround changes how exposure and color look in photos.")

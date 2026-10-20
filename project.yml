@@ -25,7 +25,8 @@ targets:
       Release: Config/Signing.xcconfig
     settings:
       base:
-        PRODUCT_NAME: PhotoCuller
+        PRODUCT_NAME: Pickture
+        PRODUCT_MODULE_NAME: PhotoCuller
         PRODUCT_BUNDLE_IDENTIFIER: com.byairu.photoculler
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"

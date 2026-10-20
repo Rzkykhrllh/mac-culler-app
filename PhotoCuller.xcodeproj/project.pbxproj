@@ -530,7 +530,8 @@
 				MARKETING_VERSION = 0.1.0;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.byairu.photoculler;
-				PRODUCT_NAME = PhotoCuller;
+				PRODUCT_MODULE_NAME = PhotoCuller;
+				PRODUCT_NAME = Pickture;
 				SDKROOT = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -678,7 +679,8 @@
 				MARKETING_VERSION = 0.1.0;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = com.byairu.photoculler;
-				PRODUCT_NAME = PhotoCuller;
+				PRODUCT_MODULE_NAME = PhotoCuller;
+				PRODUCT_NAME = Pickture;
 				SDKROOT = macosx;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;

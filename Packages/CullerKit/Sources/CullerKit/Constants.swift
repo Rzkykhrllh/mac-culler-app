@@ -4,7 +4,7 @@ import Foundation
 /// Renaming the app is a change in this file (plus `project.yml` for the bundle ID / product name).
 public enum AppConstants {
     /// User-visible application name.
-    public static let appName = "PhotoCuller"
+    public static let appName = "Pickture"
     /// Bundle identifier. Must match `PRODUCT_BUNDLE_IDENTIFIER` in `project.yml`.
     public static let bundleID = "com.byairu.photoculler"
 
