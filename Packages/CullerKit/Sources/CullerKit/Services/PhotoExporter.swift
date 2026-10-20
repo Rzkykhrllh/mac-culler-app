@@ -10,7 +10,7 @@ public struct ExportOptions: Codable, Equatable, Sendable {
         case none
         /// The same white (or `color`) margin on every side, as a percentage of the photo's shorter side.
         case border(percent: Double)
-        /// The photo centered on a canvas of a fixed ratio (e.g. 4:5 for Instagram), at least `marginPercent`
+        /// The photo centered on a canvas of a fixed ratio (e.g. 4:5), at least `marginPercent`
         /// of the photo's size around it.
         case canvas(width: Double, height: Double, marginPercent: Double)
     }
@@ -18,6 +18,8 @@ public struct ExportOptions: Codable, Equatable, Sendable {
     public enum Size: Codable, Equatable, Sendable {
         case original
         case longEdge(Int)
+        /// Exact width; the height follows the canvas.
+        case width(Int)
         case exact(width: Int, height: Int)
     }
 
@@ -37,10 +39,10 @@ public struct ExportOptions: Codable, Equatable, Sendable {
         self.suffix = suffix
     }
 
-    /// Instagram portrait post: 1080 × 1350 (4:5); a photo cropped to 4:5 fills it, others get white bars.
-    public static let instagram = ExportOptions(frame: .canvas(width: 4, height: 5, marginPercent: 0), size: .exact(width: 1080, height: 1350), suffix: "-ig")
-    /// X / Twitter: uncropped photo with a 10% white border, long edge 4096.
-    public static let twitter = ExportOptions(frame: .border(percent: 10), size: .longEdge(4096), suffix: "-x")
+    /// 4:5 portrait canvas, 1080 px wide (1080 × 1350): a photo cropped to 4:5 fills it, others get white bars.
+    public static let fourFiveCanvas = ExportOptions(frame: .canvas(width: 4, height: 5, marginPercent: 0), size: .width(1080), suffix: "-4x5")
+    /// The whole photo with a 10% white border, long edge 4096.
+    public static let whiteBorder = ExportOptions(frame: .border(percent: 10), size: .longEdge(4096), suffix: "-border")
 }
 
 public enum ExportError: Error, LocalizedError {
@@ -96,6 +98,8 @@ public enum PhotoExporter {
         switch size {
         case .original: return canvas
         case .exact(let w, let h): return CGSize(width: w, height: h)
+        case .width(let w):
+            return CGSize(width: CGFloat(w), height: (canvas.height * CGFloat(w) / max(1, canvas.width)).rounded())
         case .longEdge(let l):
             let long = max(canvas.width, canvas.height)
             guard long > CGFloat(l) else { return canvas }   // never upscale
@@ -127,7 +131,11 @@ public enum PhotoExporter {
     public static func render(_ source: CGImage, crop: CropSpec?, options o: ExportOptions) -> CGImage? {
         guard let photo = cropped(source, crop: crop) else { return nil }
         let (canvas, rect) = layout(content: CGSize(width: photo.width, height: photo.height), frame: o.frame)
-        let out = finalSize(canvas: canvas, size: o.size)
+        var out = finalSize(canvas: canvas, size: o.size)
+        // A ratio canvas at a given width is exactly that ratio (e.g. 1080 × 1350 for 4:5).
+        if case .canvas(let rw, let rh, _) = o.frame, case .width(let w) = o.size {
+            out = CGSize(width: CGFloat(w), height: (CGFloat(w) * rh / rw).rounded())
+        }
         // .exact keeps the canvas shape: scale to fit and center (bars of the frame color if the ratio differs).
         var s = min(out.width / canvas.width, out.height / canvas.height)
         // Within 1% of the output's shape: fill it (trims a pixel or two) instead of leaving a hairline bar.

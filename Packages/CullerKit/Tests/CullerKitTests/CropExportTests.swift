@@ -26,7 +26,7 @@ final class CropExportTests: XCTestCase {
     private func isRed(_ c: (Int, Int, Int)) -> Bool { c.0 > 200 && c.1 < 40 && c.2 < 40 }
 
     func testBorderTenPercentOfShorterSide() {
-        var o = ExportOptions.twitter
+        var o = ExportOptions.whiteBorder
         o.size = .original
         let out = PhotoExporter.render(red(600, 400), crop: nil, options: o)!
         XCTAssertEqual(out.width, 680)   // 40 px (10% of 400) on each side
@@ -38,7 +38,7 @@ final class CropExportTests: XCTestCase {
     }
 
     func testInstagramCanvasPadsLandscapeToFourFive() {
-        let out = PhotoExporter.render(red(600, 400), crop: nil, options: .instagram)!
+        let out = PhotoExporter.render(red(600, 400), crop: nil, options: .fourFiveCanvas)!
         XCTAssertEqual(out.width, 1080)
         XCTAssertEqual(out.height, 1350)
         XCTAssertTrue(isWhite(pixel(out, 540, 20)), "bar above")
@@ -51,7 +51,7 @@ final class CropExportTests: XCTestCase {
         let size = CGSize(width: 600, height: 400)
         let crop = CropGeometry.largest(ratio: 4.0 / 5.0, angle: 0, imageSize: size, aspect: "4:5")
         XCTAssertEqual(CropGeometry.outputSize(of: crop, imageSize: size), CGSize(width: 320, height: 400))
-        let out = PhotoExporter.render(red(600, 400), crop: crop, options: .instagram)!
+        let out = PhotoExporter.render(red(600, 400), crop: crop, options: .fourFiveCanvas)!
         XCTAssertEqual(out.width, 1080)
         XCTAssertEqual(out.height, 1350)
         XCTAssertTrue(isRed(pixel(out, 540, 3)), "no bars")
@@ -61,11 +61,20 @@ final class CropExportTests: XCTestCase {
     func testNearlyFourFiveCropHasNoHairlineBar() {
         let size = CGSize(width: 601, height: 401)
         let crop = CropGeometry.largest(ratio: 4.0 / 5.0, angle: 0, imageSize: size, aspect: "4:5")
-        let out = PhotoExporter.render(red(601, 401), crop: crop, options: .instagram)!
+        let out = PhotoExporter.render(red(601, 401), crop: crop, options: .fourFiveCanvas)!
         for x in [0, 540, 1079] {
             XCTAssertTrue(isRed(pixel(out, x, 0)) && isRed(pixel(out, x, 1349)), "edge row at x \(x)")
         }
         XCTAssertTrue(isRed(pixel(out, 0, 675)) && isRed(pixel(out, 1079, 675)))
+    }
+
+    func testCustomRatioCanvasAtWidth() {
+        var o = ExportOptions.fourFiveCanvas
+        o.frame = .canvas(width: 5, height: 4, marginPercent: 0)
+        let out = PhotoExporter.render(red(400, 600), crop: nil, options: o)!
+        XCTAssertEqual(out.width, 1080)
+        XCTAssertEqual(out.height, 864)
+        XCTAssertTrue(isWhite(pixel(out, 10, 432)) && isRed(pixel(out, 540, 432)), "portrait photo on a 5:4 canvas: bars left / right")
     }
 
     func testLongEdgeNeverUpscales() {
@@ -130,10 +139,10 @@ final class CropExportTests: XCTestCase {
         let src = TestSupport.makeImage(dir.appendingPathComponent("IMG_1.jpg"))
         let item = ItemFiles(files: [FileRef.load(src)!])
         let out = dir.appendingPathComponent("Exports")
-        let url = try PhotoExporter.export(item, crop: nil, options: .twitter, to: out)
-        XCTAssertEqual(url.lastPathComponent, "IMG_1-x.jpg")
-        let again = try PhotoExporter.export(item, crop: nil, options: .twitter, to: out)
-        XCTAssertEqual(again.lastPathComponent, "IMG_1-x 2.jpg", "never overwrites")
+        let url = try PhotoExporter.export(item, crop: nil, options: .whiteBorder, to: out)
+        XCTAssertEqual(url.lastPathComponent, "IMG_1-border.jpg")
+        let again = try PhotoExporter.export(item, crop: nil, options: .whiteBorder, to: out)
+        XCTAssertEqual(again.lastPathComponent, "IMG_1-border 2.jpg", "never overwrites")
         let s = CGImageSourceCreateWithURL(url as CFURL, nil)!
         let props = CGImageSourceCopyPropertiesAtIndex(s, 0, nil) as! [CFString: Any]
         XCTAssertEqual(props[kCGImagePropertyPixelWidth] as? Int, 96 + 2 * 6)   // 10% of 64 ≈ 6

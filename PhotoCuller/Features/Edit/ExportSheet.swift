@@ -2,18 +2,20 @@ import SwiftUI
 import UniformTypeIdentifiers
 import CullerKit
 
-/// ⇧⌘E: export the selected photos with their crop, a border or a fixed-ratio canvas (Instagram 4:5), resized.
+/// ⇧⌘E: export the selected photos with their crop, a border or a fixed-ratio canvas, resized.
 struct ExportSheet: View {
     @Bindable var session: FolderSession
     @Environment(\.dismiss) private var dismiss
     @State private var o = ExportSettings.last
     @State private var folder: URL?
     @State private var preview: CGImage?
+    /// Canvas ratio typed in (Custom…).
+    @State private var customRatio = false
 
     private enum Preset: String, CaseIterable, Identifiable {
-        case instagram, twitter, custom
+        case canvas, border, custom
         var id: String { rawValue }
-        var title: String { ["Instagram 4:5", "X / Twitter", "Custom"][Self.allCases.firstIndex(of: self)!] }
+        var title: String { ["4:5 Canvas", "White Border", "Custom"][Self.allCases.firstIndex(of: self)!] }
     }
 
     private enum FrameKind: String, CaseIterable, Identifiable {
@@ -24,8 +26,8 @@ struct ExportSheet: View {
     private var targets: [PhotoItem] { session.exportTargets.compactMap { session.items[$0] } }
 
     private var preset: Preset {
-        if o.frame == ExportOptions.instagram.frame && o.size == ExportOptions.instagram.size { return .instagram }
-        if o.frame == ExportOptions.twitter.frame && o.size == ExportOptions.twitter.size { return .twitter }
+        if o.frame == ExportOptions.fourFiveCanvas.frame && o.size == ExportOptions.fourFiveCanvas.size { return .canvas }
+        if o.frame == ExportOptions.whiteBorder.frame && o.size == ExportOptions.whiteBorder.size { return .border }
         return .custom
     }
 
@@ -60,8 +62,8 @@ struct ExportSheet: View {
             Picker("Preset", selection: Binding(get: { preset }, set: { p in
                 let keep = o
                 switch p {
-                case .instagram: o = .instagram
-                case .twitter: o = .twitter
+                case .canvas: o = .fourFiveCanvas
+                case .border: o = .whiteBorder
                 case .custom: return
                 }
                 o.quality = keep.quality; o.stripLocation = keep.stripLocation; o.useRaw = keep.useRaw
@@ -89,13 +91,32 @@ struct ExportSheet: View {
                 }
                 Text(borderExample(p)).font(.caption).foregroundStyle(.secondary)
             case .canvas(let w, let h, let m):
-                Picker("Canvas", selection: Binding(get: { "\(Int(w)):\(Int(h))" }, set: { v in
+                Picker("Canvas", selection: Binding(get: {
+                    let key = "\(fmt(w)):\(fmt(h))"
+                    return customRatio || !Self.ratios.contains(key) ? "custom" : key
+                }, set: { v in
+                    if v == "custom" { customRatio = true; return }
+                    customRatio = false
                     let parts = v.split(separator: ":").compactMap { Double($0) }
                     if parts.count == 2 { o.frame = .canvas(width: parts[0], height: parts[1], marginPercent: m) }
-                    if v == "4:5", o.size != ExportOptions.instagram.size, case .exact = o.size { o.size = ExportOptions.instagram.size }
                 })) {
-                    Text("4:5 (Instagram)").tag("4:5"); Text("1:1").tag("1:1"); Text("9:16 (story)").tag("9:16")
-                    Text("16:9").tag("16:9"); Text("3:2").tag("3:2")
+                    ForEach(Self.ratios, id: \.self) { Text($0).tag($0) }
+                    Divider()
+                    Text("Custom…").tag("custom")
+                }
+                if customRatio || !Self.ratios.contains("\(fmt(w)):\(fmt(h))") {
+                    LabeledContent("Ratio") {
+                        HStack(spacing: 6) {
+                            TextField("W", value: Binding(get: { w }, set: { o.frame = .canvas(width: max(0.1, $0), height: h, marginPercent: m) }),
+                                      format: .number.precision(.fractionLength(0...2)))
+                                .frame(width: 56).multilineTextAlignment(.trailing)
+                            Text(":")
+                            TextField("H", value: Binding(get: { h }, set: { o.frame = .canvas(width: w, height: max(0.1, $0), marginPercent: m) }),
+                                      format: .number.precision(.fractionLength(0...2)))
+                                .frame(width: 56)
+                        }
+                        .textFieldStyle(.roundedBorder)
+                    }
                 }
                 LabeledContent("Margin") {
                     HStack {
@@ -123,7 +144,7 @@ struct ExportSheet: View {
                 Text("Long edge 4096").tag("4096")
                 Text("Long edge 2048").tag("2048")
                 Text("Long edge 1080").tag("1080")
-                Text("1080 × 1350 (Instagram)").tag("ig")
+                Text("Width 1080").tag("w1080")
             }
             LabeledContent("Quality") {
                 HStack {
@@ -152,7 +173,7 @@ struct ExportSheet: View {
             switch k {
             case .none: o.frame = .none
             case .border: o.frame = .border(percent: 10)
-            case .canvas: o.frame = .canvas(width: 4, height: 5, marginPercent: 0)
+            case .canvas: o.frame = .canvas(width: 4, height: 5, marginPercent: 0); customRatio = false
             }
         })
     }
@@ -182,15 +203,30 @@ struct ExportSheet: View {
             switch o.size {
             case .original: "original"
             case .longEdge(let l): "\(l)"
-            case .exact: "ig"
+            case .width(let w): "w\(w)"
+            case .exact: "exact"
             }
         }, set: { v in
             switch v {
             case "original": o.size = .original
-            case "ig": o.size = .exact(width: 1080, height: 1350)
+            case "w1080": o.size = .width(1080)
+            case "exact": break
             default: o.size = .longEdge(Int(v) ?? 2048)
             }
         })
+    }
+
+    static let ratios = ["4:5", "1:1", "5:4", "2:3", "3:2", "9:16", "16:9"]
+
+    private func fmt(_ v: Double) -> String { v == v.rounded() ? String(Int(v)) : String(format: "%.2g", v) }
+
+    /// File name ending: what was done, e.g. "-4x5", "-border".
+    private var suffix: String {
+        switch o.frame {
+        case .none: "-export"
+        case .border: "-border"
+        case .canvas(let w, let h, _): "-\(fmt(w))x\(fmt(h))"
+        }
     }
 
     private func borderExample(_ p: Double) -> String {
@@ -202,7 +238,7 @@ struct ExportSheet: View {
     }
 
     private var destinationText: String {
-        folder.map { "Saving to \($0.path)" } ?? "Saving to an “Exports” folder next to each photo · names end in “\(o.suffix)”"
+        folder.map { "Saving to \($0.path)" } ?? "Saving to an “Exports” folder next to each photo · names end in “\(suffix)”"
     }
 
     // MARK: Preview
@@ -231,6 +267,7 @@ struct ExportSheet: View {
         guard let first = targets.first else { return }
         var p = o
         p.size = .longEdge(700)
+        if case .width = o.size { p.size = .width(560) }
         if case .exact(let w, let h) = o.size {
             let s = 700.0 / Double(max(w, h))
             p.size = .exact(width: Int(Double(w) * s), height: Int(Double(h) * s))
@@ -257,6 +294,7 @@ struct ExportSheet: View {
     }
 
     private func start() {
+        o.suffix = suffix
         ExportSettings.last = o
         let ids = session.exportTargets, options = o, dest = folder
         dismiss()

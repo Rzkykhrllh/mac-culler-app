@@ -32,6 +32,7 @@ struct FolderSidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .sidebarTopEdge()
         .frame(minWidth: 180, idealWidth: 220)
         .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
     }
@@ -125,6 +126,17 @@ private struct FolderRow: View {
                 guard await app.sidebar.requestAccess(node) else { return }
             }
             app.openFromSidebar(node.url, newTab: newTab)
+        }
+    }
+}
+
+private extension View {
+    /// Scrolled rows disappear cleanly under the window buttons instead of showing through them.
+    @ViewBuilder func sidebarTopEdge() -> some View {
+        if #available(macOS 26.0, *) {
+            self.scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            self
         }
     }
 }

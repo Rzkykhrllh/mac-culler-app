@@ -302,6 +302,26 @@ enum DebugSelfTest {
             }
             win.orderOut(nil)
         }
+        // The window with no folder open (welcome page), sidebar visible.
+        await s.app.closeSession()
+        try? await Task.sleep(for: .seconds(1.5))
+        await snap("welcome-window")
+        // Narrow window + sidebar hidden then shown again.
+        w.setContentSize(NSSize(width: 900, height: 640))
+        s.app.sidebarVisibility = .detailOnly
+        try? await Task.sleep(for: .seconds(1))
+        s.app.sidebarVisibility = .all
+        try? await Task.sleep(for: .seconds(1.2))
+        await snap("welcome-narrow-toggled")
+        // Sidebar list scrolled a little: content must not sit crisp under the traffic lights.
+        func outline(_ v: NSView) -> NSOutlineView? { (v as? NSOutlineView) ?? v.subviews.lazy.compactMap(outline).first }
+        if let o = outline(w.contentView!), let clip = o.enclosingScrollView?.contentView {
+            clip.scroll(to: NSPoint(x: 0, y: clip.bounds.minY + 36))
+            o.enclosingScrollView?.reflectScrolledClipView(clip)
+            try? await Task.sleep(for: .milliseconds(500))
+            await snap("sidebar-scrolled")
+        }
+        w.setContentSize(NSSize(width: 1300, height: 820))
         await render(AboutView(), "about")
         await render(WelcomeView().environment(s.app).frame(width: 1100, height: 900).background(Theme.backdrop), "welcome")
         await render(ShortcutsSettings().frame(width: 580, height: 520).background(Color(white: 0.12)), "shortcuts-settings")
@@ -793,16 +813,16 @@ enum DebugSelfTest {
         if let sheet = w.attachedSheet { await snap("export-sheet", window: sheet) }
         s.activeSheet = nil
         try? await Task.sleep(for: .milliseconds(500))
-        await s.export([item.id], options: .instagram, to: out)
+        await s.export([item.id], options: .fourFiveCanvas, to: out)
         let ig = (try? FileManager.default.contentsOfDirectory(at: out, includingPropertiesForKeys: nil)) ?? []
         func dims(_ u: URL) -> String {
             guard let src = CGImageSourceCreateWithURL(u as CFURL, nil), let p = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] else { return "?" }
             return "\(p[kCGImagePropertyPixelWidth] ?? 0)x\(p[kCGImagePropertyPixelHeight] ?? 0)"
         }
-        check(ig.count == 1 && dims(ig[0]) == "1080x1350" && ig[0].lastPathComponent.hasSuffix("-ig.jpg"), "Instagram export \(ig.map(\.lastPathComponent)) \(ig.map(dims))")
+        check(ig.count == 1 && dims(ig[0]) == "1080x1350" && ig[0].lastPathComponent.hasSuffix("-4x5.jpg"), "Instagram export \(ig.map(\.lastPathComponent)) \(ig.map(dims))")
         let two = Array(s.display.prefix(3).dropFirst().map(\.itemID))
-        await s.export(two, options: .twitter, to: out)
-        let all = ((try? FileManager.default.contentsOfDirectory(at: out, includingPropertiesForKeys: nil)) ?? []).filter { $0.lastPathComponent.contains("-x") }
+        await s.export(two, options: .whiteBorder, to: out)
+        let all = ((try? FileManager.default.contentsOfDirectory(at: out, includingPropertiesForKeys: nil)) ?? []).filter { $0.lastPathComponent.contains("-border") }
         check(all.count == 2, "X export wrote 2 files \(all.map { $0.lastPathComponent + " " + dims($0) })")
         try? FileManager.default.removeItem(at: out)
 

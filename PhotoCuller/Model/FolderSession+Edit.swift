@@ -117,7 +117,8 @@ enum ExportSettings {
     private static let key = "export.lastOptions"
     static var last: ExportOptions {
         get {
-            guard let d = UserDefaults.standard.data(forKey: key), let o = try? JSONDecoder().decode(ExportOptions.self, from: d) else { return .instagram }
+            guard let d = UserDefaults.standard.data(forKey: key), var o = try? JSONDecoder().decode(ExportOptions.self, from: d) else { return .fourFiveCanvas }
+            if o.size == .exact(width: 1080, height: 1350) { o.size = .width(1080) }   // earlier "1080 × 1350" choice
             return o
         }
         set { if let d = try? JSONEncoder().encode(newValue) { UserDefaults.standard.set(d, forKey: key) } }

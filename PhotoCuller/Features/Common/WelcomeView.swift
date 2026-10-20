@@ -100,7 +100,7 @@ struct WelcomeView: View {
             TipCard(symbol: "rectangle.split.2x1", title: "Find the keeper",
                     text: "Similar shots stack together. \(k("view.compare")) compares them side by side, \(k("focus.peaking")) shows what is sharp.")
             TipCard(symbol: "crop", title: "Crop & export",
-                    text: "\(k("edit.crop")) crops (4:5 for Instagram). ⇧⌘E exports with a white border or an Instagram canvas.")
+                    text: "\(k("edit.crop")) crops and straightens. ⇧⌘E exports with a white border or on a 4:5 canvas.")
             TipCard(symbol: "square.and.arrow.up", title: "Send it on",
                     text: "⌃⌘L imports into Lightroom. Share, ⌘C to paste anywhere, or move rejects to the Trash.")
         }
