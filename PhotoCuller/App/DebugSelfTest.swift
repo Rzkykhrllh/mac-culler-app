@@ -826,6 +826,14 @@ enum DebugSelfTest {
         check(all.count == 2, "X export wrote 2 files \(all.map { $0.lastPathComponent + " " + dims($0) })")
         try? FileManager.default.removeItem(at: out)
 
+        // Presets: save, match, delete (the test preset is removed again).
+        let before = ExportPresets.all.count
+        ExportPresets.save("Test preset", .whiteBorder)
+        var other = ExportOptions.whiteBorder; other.suffix = "-zzz"
+        check(ExportPresets.all.count == before + 1 && ExportPresets.all.contains { ExportPresets.same($0.options, other) }, "preset saved and matched")
+        ExportPresets.remove("Test preset")
+        check(ExportPresets.all.count == before, "preset deleted")
+
         // 5. Reset Crop.
         s.viewMode = .grid
         s.select(item.id)

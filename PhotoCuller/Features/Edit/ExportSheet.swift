@@ -12,11 +12,7 @@ struct ExportSheet: View {
     /// Canvas ratio typed in (Custom…).
     @State private var customRatio = false
 
-    private enum Preset: String, CaseIterable, Identifiable {
-        case canvas, border, custom
-        var id: String { rawValue }
-        var title: String { ["4:5 Canvas", "White Border", "Custom"][Self.allCases.firstIndex(of: self)!] }
-    }
+    @State private var presets = ExportPresets.all
 
     private enum FrameKind: String, CaseIterable, Identifiable {
         case none, border, canvas
@@ -25,10 +21,9 @@ struct ExportSheet: View {
 
     private var targets: [PhotoItem] { session.exportTargets.compactMap { session.items[$0] } }
 
-    private var preset: Preset {
-        if o.frame == ExportOptions.fourFiveCanvas.frame && o.size == ExportOptions.fourFiveCanvas.size { return .canvas }
-        if o.frame == ExportOptions.whiteBorder.frame && o.size == ExportOptions.whiteBorder.size { return .border }
-        return .custom
+    /// The saved preset matching the current settings, if any.
+    private var currentPreset: String? {
+        presets.first { ExportPresets.same($0.options, o) }?.name
     }
 
     var body: some View {
@@ -59,18 +54,31 @@ struct ExportSheet: View {
 
     @ViewBuilder private var settings: some View {
         Section {
-            Picker("Preset", selection: Binding(get: { preset }, set: { p in
-                let keep = o
-                switch p {
-                case .canvas: o = .fourFiveCanvas
-                case .border: o = .whiteBorder
-                case .custom: return
+            LabeledContent("Preset") {
+                HStack(spacing: 8) {
+                    Text(currentPreset ?? (presets.isEmpty ? "None saved yet" : "Unsaved settings"))
+                        .foregroundStyle(currentPreset == nil ? .secondary : .primary)
+                    Menu {
+                        ForEach(presets, id: \.name) { p in
+                            Toggle(p.name, isOn: Binding(get: { currentPreset == p.name }, set: { _ in o = p.options; customRatio = false }))
+                        }
+                        if !presets.isEmpty { Divider() }
+                        Button("Save as Preset…") { savePreset() }
+                        if let name = currentPreset {
+                            Button("Delete “\(name)”") { ExportPresets.remove(name); presets = ExportPresets.all }
+                        } else if !presets.isEmpty {
+                            Menu("Update Preset") {
+                                ForEach(presets, id: \.name) { p in
+                                    Button(p.name) { ExportPresets.save(p.name, o); presets = ExportPresets.all }
+                                }
+                            }
+                        }
+                    } label: { Image(systemName: "list.bullet") }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help("Your saved export settings")
                 }
-                o.quality = keep.quality; o.stripLocation = keep.stripLocation; o.useRaw = keep.useRaw
-            })) {
-                ForEach(Preset.allCases) { Text($0.title).tag($0) }
             }
-            .pickerStyle(.segmented)
         }
         Section("Frame") {
             Picker("Frame", selection: frameKind) {
@@ -291,6 +299,23 @@ struct ExportSheet: View {
 
     // MARK: Actions
 
+    private func savePreset() {
+        let a = NSAlert()
+        a.messageText = "Save as Preset"
+        a.informativeText = "A name for these export settings (frame, size, quality…)."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        field.placeholderString = "e.g. Feed 4:5, Border 10%"
+        a.accessoryView = field
+        a.addButton(withTitle: "Save")
+        a.addButton(withTitle: "Cancel")
+        a.window.initialFirstResponder = field
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        let name = field.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        ExportPresets.save(name, o)
+        presets = ExportPresets.all
+    }
+
     private func chooseFolder() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -306,5 +331,36 @@ struct ExportSheet: View {
         let ids = session.exportTargets, options = o, dest = folder
         dismiss()
         Task { await session.export(ids, options: options, to: dest) }
+    }
+}
+
+/// Export settings the user saved by name (UserDefaults).
+enum ExportPresets {
+    struct Preset: Codable { var name: String; var options: ExportOptions }
+    private static let key = "export.presets"
+
+    static var all: [Preset] {
+        guard let d = UserDefaults.standard.data(forKey: key), let p = try? JSONDecoder().decode([Preset].self, from: d) else { return [] }
+        return p
+    }
+
+    private static func store(_ p: [Preset]) {
+        if let d = try? JSONEncoder().encode(p) { UserDefaults.standard.set(d, forKey: key) }
+    }
+
+    /// Adds, or replaces the preset with that name.
+    static func save(_ name: String, _ o: ExportOptions) {
+        var p = all.filter { $0.name != name }
+        p.append(Preset(name: name, options: o))
+        store(p.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending })
+    }
+
+    static func remove(_ name: String) { store(all.filter { $0.name != name }) }
+
+    /// Same settings (the file-name suffix is derived, so it doesn't count).
+    static func same(_ a: ExportOptions, _ b: ExportOptions) -> Bool {
+        var x = a, y = b
+        x.suffix = ""; y.suffix = ""
+        return x == y
     }
 }
