@@ -303,6 +303,7 @@ enum DebugSelfTest {
             win.orderOut(nil)
         }
         await render(AboutView(), "about")
+        await render(WelcomeView().environment(s.app).frame(width: 1100, height: 900).background(Theme.backdrop), "welcome")
         await render(ShortcutsSettings().frame(width: 580, height: 520).background(Color(white: 0.12)), "shortcuts-settings")
         // Zoomed loupe with the Fit button.
         s.viewMode = .loupe

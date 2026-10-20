@@ -118,6 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ThemeStore.shared.applyAppIcon()
+        AppModel.shared.purgeTestRecents()
         // macOS inserts "Emoji & Symbols" / "Start Dictation" into the Edit menu itself; with custom Edit
         // commands it can do so twice. Remove duplicates whenever the menu changes.
         Self.dedupeMenus()

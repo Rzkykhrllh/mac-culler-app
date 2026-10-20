@@ -264,6 +264,13 @@ final class AppModel {
     }
 
     /// Opens `url` in the active tab.
+    /// Removes folders from the app's own container (test runs) from Recent.
+    func purgeTestRecents() {
+        for e in recentFolders.entries where e.path.contains("/Library/Containers/com.byairu.photoculler/") {
+            recentFolders.remove(path: e.path)
+        }
+    }
+
     func open(folder url: URL, securityScoped: Bool = false, includeSubfolders: Bool? = nil) {
         open(folder: url, in: activeTab, includeSubfolders: includeSubfolders)
     }
@@ -289,7 +296,12 @@ final class AppModel {
             }
             tab.pendingFolder = nil
             Log.session.info("Opening \(url.path, privacy: .public) (subfolders: \(subfolders))")
+            #if DEBUG
+            // Test runs (-openFolder) never touch the user's Recent list.
+            if !ProcessInfo.processInfo.arguments.contains("-openFolder") { recentFolders.add(url) }
+            #else
             recentFolders.add(url)
+            #endif
             let s = FolderSession(folder: url, includeSubfolders: subfolders, app: self, stopAccessingOnClose: false)
             tab.session = s
             saveTabs()
