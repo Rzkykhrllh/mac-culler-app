@@ -7,10 +7,10 @@ A native macOS photo culling app for RAW + JPEG shooters.</p>
 
 <p align="center">
   <a href="https://github.com/Rzkykhrllh/pickture/releases/latest"><b>⬇︎ Download for macOS</b></a> ·
-  <a href="https://github.com/Rzkykhrllh/pickture/releases/download/v0.1.1/pickture-demo.mp4"><b>▶︎ Watch the 1-minute demo</b></a>
+  <a href="https://www.youtube.com/watch?v=Qk3aPS0QpDs"><b>▶︎ Watch the demo on YouTube</b></a>
 </p>
 
-<p align="center"><a href="https://github.com/Rzkykhrllh/pickture/releases/download/v0.1.1/pickture-demo.mp4"><img src="docs/screenshots/demo-poster.jpg" width="900" alt="Pickture demo video: culling a RAW + JPEG shoot from the keyboard"></a></p>
+<p align="center"><a href="https://www.youtube.com/watch?v=Qk3aPS0QpDs"><img src="docs/screenshots/demo-poster.jpg" width="900" alt="Pickture demo video: culling a RAW + JPEG shoot from the keyboard"></a></p>
 
 ---
 
@@ -211,7 +211,7 @@ log stream --predicate 'subsystem == "com.byairu.photoculler"' --level info
 ```
 
 `-demo` runs a scripted tour (on a *copy* of a shoot: it writes marks and a crop) and saves the README screenshots
-and `pickture-demo.mp4` to `Documents/Demo` in the container, then quits.
+and `pickture-demo.mp4` (the YouTube demo) to `Documents/Demo` in the container, then quits.
 
 Other flags: `-uiSnapshots`, `-scrollTest`, `-modeTest`, `-editTest`, `-shortcutTest`, `-trashTest`, `-hangWatch`, `-subfolders`.
 Use folders inside the app container: `Data/Pictures` etc. there are symlinks to your real folders.
