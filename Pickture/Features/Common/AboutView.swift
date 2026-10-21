@@ -5,6 +5,7 @@ import CullerKit
 struct AboutView: View {
     static let website = URL(string: "https://dev.byairu.com")!
     static let github = URL(string: "https://github.com/Rzkykhrllh")!
+    static let support = URL(string: "https://ko-fi.com/airu_")!
 
     private var version: String {
         let info = Bundle.main.infoDictionary
@@ -50,6 +51,19 @@ struct AboutView: View {
             .frame(maxWidth: .infinity)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.white.opacity(0.05)))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.white.opacity(0.08)))
+
+            VStack(spacing: 6) {
+                Text("Pickture is free. If it saves you time, you can buy me a coffee.")
+                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                Link(destination: Self.support) {
+                    Label("Support on Ko-fi", systemImage: "cup.and.saucer.fill")
+                        .font(.callout.weight(.medium))
+                        .padding(.horizontal, 14).padding(.vertical, 7)
+                        .background(Color.white.opacity(0.1), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(Self.support.absoluteString)
+            }
 
             Text("© 2026 Rizky Khairullah").font(.caption2).foregroundStyle(.tertiary)
         }

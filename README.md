@@ -7,7 +7,8 @@ A native macOS photo culling app for RAW + JPEG shooters.</p>
 
 <p align="center">
   <a href="https://github.com/Rzkykhrllh/pickture/releases/latest"><b>⬇︎ Download for macOS</b></a> ·
-  <a href="https://www.youtube.com/watch?v=Qk3aPS0QpDs"><b>▶︎ Watch the demo on YouTube</b></a>
+  <a href="https://www.youtube.com/watch?v=Qk3aPS0QpDs"><b>▶︎ Watch the demo on YouTube</b></a> ·
+  <a href="https://ko-fi.com/airu_"><b>☕ Support on Ko-fi</b></a>
 </p>
 
 <p align="center"><a href="https://www.youtube.com/watch?v=Qk3aPS0QpDs"><img src="docs/screenshots/demo-poster.jpg" width="900" alt="Pickture demo video: culling a RAW + JPEG shoot from the keyboard"></a></p>
@@ -215,6 +216,14 @@ and `pickture-demo.mp4` (the YouTube demo) to `Documents/Demo` in the container,
 
 Other flags: `-uiSnapshots`, `-scrollTest`, `-modeTest`, `-editTest`, `-shortcutTest`, `-trashTest`, `-hangWatch`, `-subfolders`.
 Use folders inside the app container: `Data/Pictures` etc. there are symlinks to your real folders.
+
+## Support
+
+Pickture is free. If it saves you time on your shoots, you can support its development:
+
+<a href="https://ko-fi.com/airu_"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support Pickture on Ko-fi"></a>
+
+Bug reports and feature ideas are just as welcome — open an [issue](https://github.com/Rzkykhrllh/pickture/issues).
 
 ## Credits
 

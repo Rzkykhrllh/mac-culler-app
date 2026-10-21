@@ -345,6 +345,7 @@ struct AppCommands: Commands {
                 a.runModal()
             }
             Button("Visit dev.byairu.com") { NSWorkspace.shared.open(AboutView.website) }
+            Button("Support Pickture on Ko-fi…") { NSWorkspace.shared.open(AboutView.support) }
         }
 
         CommandMenu("Debug") {
